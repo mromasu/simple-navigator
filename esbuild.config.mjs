@@ -1,6 +1,7 @@
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { rename } from "fs/promises";
 
 const banner =
 `/*
@@ -15,7 +16,7 @@ const context = await esbuild.context({
 	banner: {
 		js: banner,
 	},
-	entryPoints: ["main.ts"],
+	entryPoints: ["src/main.ts"],
 	bundle: true,
 	external: [
 		"obsidian",
@@ -41,9 +42,25 @@ const context = await esbuild.context({
 	minify: prod,
 });
 
+const renameCSS = async () => {
+	try {
+		await rename("main.css", "styles.css");
+	} catch (err) {
+		// Ignore if main.css doesn't exist
+		if (err.code !== 'ENOENT') {
+			console.error("Error renaming CSS file:", err);
+		}
+	}
+};
+
 if (prod) {
 	await context.rebuild();
+	await renameCSS();
 	process.exit(0);
 } else {
 	await context.watch();
+	// Watch for CSS changes and rename
+	const watchCSS = setInterval(async () => {
+		await renameCSS();
+	}, 1000);
 }
