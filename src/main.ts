@@ -1,4 +1,5 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { NavigatorView, NAVIGATOR_VIEW_TYPE } from './navigator-view';
 import './styles.css';
 
 // Remember to rename these classes and interfaces!
@@ -16,6 +17,15 @@ export default class MyPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// Register the navigator view
+		this.registerView(
+			NAVIGATOR_VIEW_TYPE,
+			(leaf) => new NavigatorView(leaf)
+		);
+
+		// Open navigator view in left sidebar if not already present
+		this.initializeNavigatorView();
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
@@ -89,6 +99,18 @@ export default class MyPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+	}
+
+	private async initializeNavigatorView(): Promise<void> {
+		// Check if navigator view already exists
+		const existingLeaf = this.app.workspace.getLeavesOfType(NAVIGATOR_VIEW_TYPE)[0];
+		if (!existingLeaf) {
+			// Create navigator view in left sidebar
+			const leaf = this.app.workspace.getLeftLeaf(false);
+			if (leaf) {
+				await leaf.setViewState({ type: NAVIGATOR_VIEW_TYPE, active: false });
+			}
+		}
 	}
 }
 
