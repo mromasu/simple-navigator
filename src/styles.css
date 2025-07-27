@@ -129,7 +129,7 @@ If your plugin does not need CSS, delete this file.
 }
 
 .folder-item.root-header .folder-header:hover {
-	background-color: var(--background-secondary);
+	background-color: var(--background-modifier-hover);
 }
 
 /* Motion sensitivity support */
