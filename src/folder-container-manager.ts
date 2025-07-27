@@ -18,13 +18,7 @@ export class FolderContainerManager {
 	}
 
 	private bindEvents(): void {
-		// Handle escape key to close container
-		document.addEventListener('keydown', (e) => {
-			if (e.key === 'Escape' && this.container) {
-				this.closeContainer();
-			}
-		});
-
+		// Only close button closes the container - no ESC key
 	}
 
 	openContainer(folder: TFolder): void {
