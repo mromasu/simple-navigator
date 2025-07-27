@@ -120,6 +120,15 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		
 		const rootHeader = rootEl.createEl('div', { cls: 'folder-header' });
 		
+		// Add click handler for root folder header (excluding chevron)
+		rootHeader.addEventListener('click', (e) => {
+			// Prevent if clicking chevron
+			const target = e.target as HTMLElement;
+			if (target && !target.closest('.folder-chevron-container')) {
+				this.containerManager.openContainer(rootFolder);
+			}
+		});
+		
 		// Root folder icon (always closed folder icon since it's not collapsible)
 		const folderIconContainer = rootHeader.createEl('span', { cls: 'folder-icon' });
 		const folderIcon = this.getFolderIcon(false, true);
