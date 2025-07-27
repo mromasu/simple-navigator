@@ -1,10 +1,21 @@
 import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile } from 'obsidian';
+import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 
 export const NAVIGATOR_VIEW_TYPE = 'navigator-view';
 
-export class NavigatorView extends ItemView {
+interface FolderElements {
+	container: HTMLElement;
+	header: HTMLElement;
+	icon: HTMLElement;
+	chevron?: HTMLElement;
+	count: HTMLElement;
+	children?: HTMLElement;
+}
+
+export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	private expandedFolders: Set<string> = new Set();
 	private folderCounts: Map<string, number> = new Map();
+	private folderElements: Map<string, FolderElements> = new Map();
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -33,11 +44,51 @@ export class NavigatorView extends ItemView {
 		const treeContainer = container.createEl('div', { cls: 'folder-tree' });
 		this.renderFolderTree(treeContainer);
 		
-		this.registerVaultEvents();
+		// Register with VaultObserver instead of direct vault events
+		VaultObserver.getInstance(this.app).registerView(this);
 	}
 
 	async onClose(): Promise<void> {
-		// Clean up if needed
+		// Unregister from VaultObserver
+		VaultObserver.getInstance(this.app).unregisterView(this);
+	}
+
+	private createLucideIcon(pathData: string, className: string = ''): SVGSVGElement {
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+		svg.setAttribute('width', '16');
+		svg.setAttribute('height', '16');
+		svg.setAttribute('viewBox', '0 0 24 24');
+		svg.setAttribute('fill', 'none');
+		svg.setAttribute('stroke', 'currentColor');
+		svg.setAttribute('stroke-width', '2');
+		svg.setAttribute('stroke-linecap', 'round');
+		svg.setAttribute('stroke-linejoin', 'round');
+		
+		if (className) {
+			svg.setAttribute('class', className);
+		}
+		
+		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+		path.setAttribute('d', pathData);
+		svg.appendChild(path);
+		
+		return svg;
+	}
+
+	private getFolderIcon(isExpanded: boolean, hasChildren: boolean): SVGSVGElement {
+		if (hasChildren && isExpanded) {
+			// folder-open icon
+			return this.createLucideIcon('m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2');
+		} else {
+			// folder icon
+			return this.createLucideIcon('M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z');
+		}
+	}
+
+	private getChevronIcon(isExpanded: boolean): SVGSVGElement {
+		const className = isExpanded ? 'folder-chevron expanded' : 'folder-chevron collapsed';
+		return this.createLucideIcon('m9 18 6-6-6-6', className);
 	}
 
 	private renderFolderTree(container: HTMLElement): void {
@@ -50,44 +101,65 @@ export class NavigatorView extends ItemView {
 	private renderFolder(folder: TFolder, parent: HTMLElement, depth: number): void {
 		const folderEl = parent.createEl('div', { cls: 'folder-item' });
 		folderEl.style.paddingLeft = `${depth * 16}px`;
+		folderEl.setAttribute('data-folder-path', folder.path);
 		
 		const folderHeader = folderEl.createEl('div', { cls: 'folder-header' });
 		
 		const hasChildren = folder.children.some(child => child instanceof TFolder);
 		const isExpanded = this.expandedFolders.has(folder.path);
 		
-		if (hasChildren) {
-			const chevron = folderHeader.createEl('span', { 
-				cls: `folder-chevron ${isExpanded ? 'expanded' : 'collapsed'}` 
-			});
-			chevron.innerHTML = isExpanded ? '▼' : '▶';
-			chevron.addEventListener('click', (e) => {
-				e.stopPropagation();
-				this.toggleFolder(folder.path);
-			});
-		} else {
-			folderHeader.createEl('span', { cls: 'folder-spacer' });
-		}
-		
-		const folderIcon = folderHeader.createEl('span', { cls: 'folder-icon' });
-		folderIcon.innerHTML = '📁';
+		const folderIconContainer = folderHeader.createEl('span', { cls: 'folder-icon' });
+		const folderIcon = this.getFolderIcon(isExpanded, hasChildren);
+		folderIconContainer.appendChild(folderIcon);
 		
 		const folderName = folderHeader.createEl('span', { cls: 'folder-name' });
-		folderName.textContent = folder.name || '/';
+		folderName.textContent = folder.isRoot() ? 'Notes' : folder.name;
 		
 		const noteCount = this.folderCounts.get(folder.path) || 0;
 		const countEl = folderHeader.createEl('span', { cls: 'folder-count' });
 		countEl.textContent = noteCount.toString();
 		
-		if (hasChildren && isExpanded) {
-			const childrenContainer = folderEl.createEl('div', { cls: 'folder-children' });
+		let chevronElement: HTMLElement | undefined;
+		let childrenContainer: HTMLElement | undefined;
+		
+		if (hasChildren) {
+			const chevronContainer = folderHeader.createEl('span', { cls: 'folder-chevron-container' });
+			const chevron = this.getChevronIcon(isExpanded);
+			chevronContainer.appendChild(chevron);
+			chevronElement = chevronContainer;
+			
+			chevronContainer.addEventListener('click', (e) => {
+				e.stopPropagation();
+				this.toggleFolder(folder.path);
+			});
+			
+			childrenContainer = folderEl.createEl('div', { cls: 'folder-children' });
+			
+			// Always render children but control visibility with CSS classes
 			const subfolders = folder.children.filter(child => child instanceof TFolder) as TFolder[];
 			subfolders.sort((a, b) => a.name.localeCompare(b.name));
 			
 			for (const subfolder of subfolders) {
 				this.renderFolder(subfolder, childrenContainer, depth + 1);
 			}
+			
+			// Set initial animation state
+			if (isExpanded) {
+				childrenContainer.addClass('expanded');
+			} else {
+				childrenContainer.addClass('collapsed');
+			}
 		}
+		
+		// Store element references for smart updates
+		this.folderElements.set(folder.path, {
+			container: folderEl,
+			header: folderHeader,
+			icon: folderIconContainer,
+			chevron: chevronElement,
+			count: countEl,
+			children: childrenContainer
+		});
 	}
 
 	private calculateFolderCounts(): void {
@@ -112,40 +184,123 @@ export class NavigatorView extends ItemView {
 	}
 
 	private toggleFolder(folderPath: string): void {
-		if (this.expandedFolders.has(folderPath)) {
-			this.expandedFolders.delete(folderPath);
-		} else {
+		const isExpanded = this.expandedFolders.has(folderPath);
+		const newExpanded = !isExpanded;
+		
+		if (newExpanded) {
 			this.expandedFolders.add(folderPath);
+		} else {
+			this.expandedFolders.delete(folderPath);
 		}
 		
-		const container = this.containerEl.querySelector('.folder-tree');
-		if (container) {
-			container.empty();
-			this.renderFolderTree(container as HTMLElement);
+		this.updateFolderExpansion(folderPath, newExpanded);
+	}
+
+	private updateFolderExpansion(folderPath: string, isExpanded: boolean): void {
+		const elements = this.folderElements.get(folderPath);
+		if (!elements || !elements.chevron || !elements.children) return;
+		
+		const folder = this.app.vault.getFolderByPath(folderPath);
+		if (!folder) return;
+		
+		// Update chevron rotation
+		const chevronIcon = elements.chevron.querySelector('.folder-chevron');
+		if (chevronIcon) {
+			if (isExpanded) {
+				chevronIcon.addClass('expanded');
+			} else {
+				chevronIcon.removeClass('expanded');
+			}
+		}
+		
+		// Update folder icon
+		const hasChildren = folder.children.some(child => child instanceof TFolder);
+		const newIcon = this.getFolderIcon(isExpanded, hasChildren);
+		elements.icon.empty();
+		elements.icon.appendChild(newIcon);
+		
+		// Show/hide children instantly
+		if (isExpanded) {
+			// Render children if not already rendered
+			if (elements.children.children.length === 0) {
+				const subfolders = folder.children.filter(child => child instanceof TFolder) as TFolder[];
+				subfolders.sort((a, b) => a.name.localeCompare(b.name));
+				
+				const depth = (elements.container.style.paddingLeft.replace('px', '') as any) / 16 + 1;
+				for (const subfolder of subfolders) {
+					this.renderFolder(subfolder, elements.children, depth);
+				}
+			}
+			
+			// Show children instantly
+			elements.children.removeClass('collapsed');
+			elements.children.addClass('expanded');
+		} else {
+			// Hide children instantly
+			elements.children.removeClass('expanded');
+			elements.children.addClass('collapsed');
 		}
 	}
 
-	private registerVaultEvents(): void {
-		this.registerEvent(
-			this.app.vault.on('create', () => {
-				this.refreshView();
-			})
-		);
+	private updateFolderCount(folderPath: string, newCount: number): void {
+		const elements = this.folderElements.get(folderPath);
+		if (elements) {
+			elements.count.textContent = newCount.toString();
+		}
+	}
+
+	// VaultUpdateHandler interface implementation
+	handleFileCreate(file: TAbstractFile, affectedFolders: string[]): void {
+		if (file instanceof TFile) {
+			this.updateCountsForAffectedFolders(affectedFolders);
+		} else if (file instanceof TFolder) {
+			// For new folders, we need a full refresh
+			this.refreshView();
+		}
+	}
+
+	handleFileDelete(file: TAbstractFile, affectedFolders: string[]): void {
+		if (file instanceof TFile) {
+			this.updateCountsForAffectedFolders(affectedFolders);
+		} else if (file instanceof TFolder) {
+			// Remove folder element and refresh parent
+			this.folderElements.delete(file.path);
+			this.refreshView();
+		}
+	}
+
+	handleFileRename(file: TAbstractFile, oldPath: string, affectedFolders: string[]): void {
+		if (file instanceof TFolder) {
+			// Update folder element references and refresh
+			this.folderElements.delete(oldPath);
+			this.refreshView();
+		} else {
+			// Update counts for all affected folders
+			this.updateCountsForAffectedFolders(affectedFolders);
+		}
+	}
+
+	handleFileModify(file: TAbstractFile, affectedFolders: string[]): void {
+		// Only handle folder structure modifications
+		if (file instanceof TFolder) {
+			this.updateCountsForAffectedFolders(affectedFolders);
+		}
+	}
+
+	private updateCountsForAffectedFolders(affectedFolders: string[]): void {
+		// Recalculate counts
+		this.calculateFolderCounts();
 		
-		this.registerEvent(
-			this.app.vault.on('delete', () => {
-				this.refreshView();
-			})
-		);
-		
-		this.registerEvent(
-			this.app.vault.on('rename', () => {
-				this.refreshView();
-			})
-		);
+		// Update counts for all affected folders
+		for (const folderPath of affectedFolders) {
+			const newCount = this.folderCounts.get(folderPath) || 0;
+			this.updateFolderCount(folderPath, newCount);
+		}
 	}
 
 	private refreshView(): void {
+		// Clear element tracking and do full refresh as fallback
+		this.folderElements.clear();
 		const container = this.containerEl.querySelector('.folder-tree');
 		if (container) {
 			container.empty();

@@ -44,10 +44,7 @@ The plugin follows standard Obsidian plugin patterns:
 - CSS changes are automatically renamed from `main.css` to `styles.css` during build
 - Plugin is installed in `.obsidian/plugins/simple-navigator/` within an Obsidian vault
 
-## Task Management
+## ALWAYS KEEP IN MIND
 
 - Commit progress as last task in todo list
-
-## Documentation Resources
-
-- Use "https://docs.obsidian.md" to get docs for obsidian API and CSS styling variables
+- Use "https://docs.obsidian.md" to get docs for obsidian API and CSS styling variables.

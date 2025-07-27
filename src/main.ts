@@ -1,5 +1,6 @@
 import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { NavigatorView, NAVIGATOR_VIEW_TYPE } from './navigator-view';
+import { VaultObserver } from './vault-observer';
 import './styles.css';
 
 // Remember to rename these classes and interfaces!
@@ -17,6 +18,9 @@ export default class MyPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		// Initialize VaultObserver singleton
+		VaultObserver.getInstance(this.app);
 
 		// Register the navigator view
 		this.registerView(
@@ -90,7 +94,8 @@ export default class MyPlugin extends Plugin {
 	}
 
 	onunload() {
-
+		// Clean up VaultObserver singleton
+		VaultObserver.cleanup();
 	}
 
 	async loadSettings() {
