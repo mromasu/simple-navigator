@@ -146,9 +146,8 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			// Set initial animation state
 			if (isExpanded) {
 				childrenContainer.addClass('expanded');
-			} else {
-				childrenContainer.addClass('collapsed');
 			}
+			// Note: collapsed state is handled by default CSS Grid state (0fr)
 		}
 		
 		// Store element references for smart updates
@@ -219,7 +218,7 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		elements.icon.empty();
 		elements.icon.appendChild(newIcon);
 		
-		// Show/hide children instantly
+		// Manage children with smooth animation
 		if (isExpanded) {
 			// Render children if not already rendered
 			if (elements.children.children.length === 0) {
@@ -232,13 +231,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 				}
 			}
 			
-			// Show children instantly
-			elements.children.removeClass('collapsed');
+			// Expand with smooth animation
 			elements.children.addClass('expanded');
 		} else {
-			// Hide children instantly
+			// Collapse with smooth animation
 			elements.children.removeClass('expanded');
-			elements.children.addClass('collapsed');
 		}
 	}
 

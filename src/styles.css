@@ -101,15 +101,29 @@ If your plugin does not need CSS, delete this file.
 }
 
 .folder-children {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: 250ms grid-template-rows ease;
+	overflow: hidden;
 	border-left: 1px solid var(--background-modifier-border);
 	margin-left: 8px;
-	overflow: hidden;
-}
-
-.folder-children.collapsed {
-	display: none;
 }
 
 .folder-children.expanded {
-	display: block;
+	grid-template-rows: 1fr;
+}
+
+.folder-children > .folder-item {
+	overflow: hidden;
+}
+
+/* Motion sensitivity support */
+@media (prefers-reduced-motion: reduce) {
+	.folder-children {
+		transition: none;
+	}
+	
+	.folder-chevron {
+		transition: color 0.1s ease;
+	}
 }
