@@ -2,6 +2,21 @@ import { App, TFolder, TFile, TAbstractFile, Vault } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import MyPlugin from './main';
 
+interface FileItemElements {
+	container: HTMLElement;
+	content: HTMLElement;
+	title: HTMLElement;
+	preview: HTMLElement;
+	meta: HTMLElement;
+	folderBadge?: HTMLElement;
+}
+
+interface GroupElements {
+	container: HTMLElement;
+	header: HTMLElement;
+	groupContainer: HTMLElement;
+}
+
 export class FolderContainerManager implements VaultUpdateHandler {
 	private app: App;
 	private plugin: MyPlugin;
@@ -11,6 +26,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private isDragging = false;
 	private dragStartX = 0;
 	private dragStartWidth = 0;
+	private fileElements: Map<string, FileItemElements> = new Map();
+	private groupElements: Map<string, GroupElements> = new Map();
 
 	constructor(app: App, plugin: MyPlugin) {
 		this.app = app;
@@ -42,6 +59,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			this.container = null;
 			this.currentFolder = null;
 			this.resizeHandle = null;
+			
+			// Clear element tracking
+			this.fileElements.clear();
+			this.groupElements.clear();
 		}
 	}
 
@@ -240,6 +261,13 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Group container
 		const container = group.createEl('div', { cls: 'file-list-group-container' });
 		
+		// Store group element references
+		this.groupElements.set(groupName, {
+			container: group,
+			header: header,
+			groupContainer: container
+		});
+		
 		// File items
 		for (let i = 0; i < files.length; i++) {
 			this.renderFileItem(container, files[i]);
@@ -269,10 +297,21 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const meta = item.createEl('div', { cls: 'file-item-meta' });
 		
 		// Folder badge (if not in root)
+		let folderBadge: HTMLElement | undefined;
 		if (!file.parent?.isRoot()) {
-			const folder = meta.createEl('span', { cls: 'file-item-folder' });
-			folder.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
+			folderBadge = meta.createEl('span', { cls: 'file-item-folder' });
+			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 		}
+		
+		// Store file element references
+		this.fileElements.set(file.path, {
+			container: item,
+			content: itemContent,
+			title: fileName,
+			preview: preview,
+			meta: meta,
+			folderBadge: folderBadge
+		});
 		
 		// Click handler
 		item.addEventListener('click', () => {
@@ -377,51 +416,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
-	// VaultUpdateHandler interface implementation
-	handleFileCreate(file: TAbstractFile, affectedFolders: string[]): void {
-		if (!this.container || !this.currentFolder) return;
-		
-		// Only handle files in the current folder or its children
-		if (!this.isFileInCurrentFolder(file)) return;
-		
-		if (file instanceof TFile) {
-			this.refreshFileList();
-		}
-	}
-
-	handleFileDelete(file: TAbstractFile, affectedFolders: string[]): void {
-		if (!this.container || !this.currentFolder) return;
-		
-		// Only handle files that were in the current folder or its children
-		if (!this.isFileInCurrentFolder(file)) return;
-		
-		if (file instanceof TFile) {
-			this.refreshFileList();
-		}
-	}
-
-	handleFileRename(file: TAbstractFile, oldPath: string, affectedFolders: string[]): void {
-		if (!this.container || !this.currentFolder) return;
-		
-		// Check if file was or is now in current folder
-		const wasInFolder = this.isPathInCurrentFolder(oldPath);
-		const isInFolder = this.isFileInCurrentFolder(file);
-		
-		if ((wasInFolder || isInFolder) && file instanceof TFile) {
-			this.refreshFileList();
-		}
-	}
-
-	handleFileModify(file: TAbstractFile, affectedFolders: string[]): void {
-		if (!this.container || !this.currentFolder) return;
-		
-		// Only handle files in the current folder or its children
-		if (!this.isFileInCurrentFolder(file)) return;
-		
-		if (file instanceof TFile) {
-			this.refreshFileList();
-		}
-	}
 
 	private isFileInCurrentFolder(file: TAbstractFile): boolean {
 		if (!this.currentFolder) return false;
@@ -457,10 +451,320 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private refreshFileList(): void {
 		if (!this.container || !this.currentFolder) return;
 		
+		// Clear element tracking before full refresh
+		this.fileElements.clear();
+		this.groupElements.clear();
+		
 		const content = this.container.querySelector('.folder-container-content');
 		if (content) {
 			content.empty();
 			this.renderFileList(content as HTMLElement);
 		}
+	}
+
+	// Smart update methods for hybrid rendering
+	private async updateFileItem(file: TFile): Promise<void> {
+		const elements = this.fileElements.get(file.path);
+		if (!elements) return;
+		
+		// Update title
+		elements.title.textContent = file.basename;
+		
+		// Update preview
+		await this.setFilePreview(elements.preview, file);
+		
+		// Update folder badge
+		if (elements.folderBadge) {
+			elements.folderBadge.remove();
+			elements.folderBadge = undefined;
+		}
+		
+		if (!file.parent?.isRoot()) {
+			const folderBadge = elements.meta.createEl('span', { cls: 'file-item-folder' });
+			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
+			elements.folderBadge = folderBadge;
+		}
+	}
+
+	private addFileItem(file: TFile, groupName: string): void {
+		const groupElements = this.groupElements.get(groupName);
+		if (!groupElements) {
+			// Group doesn't exist, create it
+			this.ensureGroupExists(groupName);
+			return this.addFileItem(file, groupName);
+		}
+		
+		// Get sorted position for the file
+		const files = this.getFilesInGroup(groupName);
+		files.push(file);
+		files.sort((a, b) => b.stat.mtime - a.stat.mtime);
+		
+		const insertIndex = files.indexOf(file);
+		const existingItems = Array.from(groupElements.groupContainer.querySelectorAll('.file-item'));
+		
+		// Create temporary container to render the file item
+		const tempContainer = document.createElement('div');
+		this.renderFileItem(tempContainer, file);
+		const newItem = tempContainer.firstChild as HTMLElement;
+		
+		// Insert at correct position
+		if (insertIndex === 0) {
+			groupElements.groupContainer.insertBefore(newItem, existingItems[0] || null);
+		} else {
+			// Find the item to insert after (accounting for dividers)
+			const itemIndex = Math.min(insertIndex, existingItems.length);
+			const afterItem = existingItems[itemIndex - 1];
+			if (afterItem && afterItem.nextSibling) {
+				groupElements.groupContainer.insertBefore(newItem, afterItem.nextSibling);
+			} else {
+				groupElements.groupContainer.appendChild(newItem);
+			}
+		}
+		
+		// Add divider if needed
+		if (existingItems.length > 0) {
+			const divider = document.createElement('div');
+			divider.className = 'file-item-divider';
+			if (insertIndex === 0) {
+				groupElements.groupContainer.insertBefore(divider, newItem.nextSibling);
+			} else {
+				groupElements.groupContainer.insertBefore(divider, newItem);
+			}
+		}
+	}
+
+	private removeFileItem(file: TFile): void {
+		const elements = this.fileElements.get(file.path);
+		if (!elements) return;
+		
+		// Remove the divider after this item (if exists)
+		const nextSibling = elements.container.nextSibling;
+		if (nextSibling && (nextSibling as HTMLElement).className === 'file-item-divider') {
+			nextSibling.remove();
+		} else {
+			// Remove the divider before this item (if it's the first item)
+			const prevSibling = elements.container.previousSibling;
+			if (prevSibling && (prevSibling as HTMLElement).className === 'file-item-divider') {
+				prevSibling.remove();
+			}
+		}
+		
+		// Remove the file item
+		elements.container.remove();
+		this.fileElements.delete(file.path);
+		
+		// Check if group is now empty and remove if needed
+		const groupName = this.getTargetGroup(file);
+		this.removeEmptyGroup(groupName);
+	}
+
+	private moveFileItem(file: TFile, oldGroupName: string, newGroupName: string): void {
+		this.removeFileItem(file);
+		this.addFileItem(file, newGroupName);
+	}
+
+	private ensureGroupExists(groupName: string): void {
+		if (this.groupElements.has(groupName)) return;
+		
+		const content = this.container?.querySelector('.folder-container-content');
+		if (!content) return;
+		
+		// Determine where to insert this group based on date order
+		const groups = Array.from(this.groupElements.keys());
+		
+		let insertBefore: HTMLElement | null = null;
+		
+		// Find correct position to insert the group
+		for (const existingGroup of groups) {
+			const existingGroupElement = this.groupElements.get(existingGroup)?.container;
+			if (!existingGroupElement) continue;
+			
+			if (this.compareGroupOrder(groupName, existingGroup) < 0) {
+				insertBefore = existingGroupElement;
+				break;
+			}
+		}
+		
+		// Create the group with empty files array
+		const tempContainer = document.createElement('div');
+		this.renderFileGroup(tempContainer, groupName, []);
+		const newGroup = tempContainer.firstChild as HTMLElement;
+		
+		if (insertBefore) {
+			content.insertBefore(newGroup, insertBefore);
+		} else {
+			content.appendChild(newGroup);
+		}
+	}
+
+	private removeEmptyGroup(groupName: string): void {
+		const groupElements = this.groupElements.get(groupName);
+		if (!groupElements) return;
+		
+		// Check if group is empty
+		const fileItems = groupElements.groupContainer.querySelectorAll('.file-item');
+		if (fileItems.length === 0) {
+			groupElements.container.remove();
+			this.groupElements.delete(groupName);
+		}
+	}
+
+	private getTargetGroup(file: TFile): string {
+		const fileDate = new Date(file.stat.mtime);
+		const now = new Date();
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+		const fileDateOnly = new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate());
+		
+		if (fileDateOnly.getTime() === today.getTime()) {
+			return 'Today';
+		} else if (fileDateOnly.getTime() === yesterday.getTime()) {
+			return 'Yesterday';
+		} else {
+			return this.formatDateGroup(fileDate);
+		}
+	}
+
+	private getFilesInGroup(groupName: string): TFile[] {
+		const files: TFile[] = [];
+		const groupElements = this.groupElements.get(groupName);
+		if (!groupElements) return files;
+		
+		// Get files from existing DOM elements
+		for (const [filePath, elements] of this.fileElements.entries()) {
+			if (groupElements.groupContainer.contains(elements.container)) {
+				const file = this.app.vault.getFileByPath(filePath);
+				if (file instanceof TFile) {
+					files.push(file);
+				}
+			}
+		}
+		
+		return files;
+	}
+
+	private compareGroupOrder(groupA: string, groupB: string): number {
+		const order = ['Today', 'Yesterday'];
+		const indexA = order.indexOf(groupA);
+		const indexB = order.indexOf(groupB);
+		
+		// If both are in predefined order
+		if (indexA !== -1 && indexB !== -1) {
+			return indexA - indexB;
+		}
+		
+		// If only A is in predefined order, A comes first
+		if (indexA !== -1) return -1;
+		
+		// If only B is in predefined order, B comes first
+		if (indexB !== -1) return 1;
+		
+		// Both are date strings, compare by date (newest first)
+		// This would need date parsing, but for simplicity, use string comparison
+		return groupB.localeCompare(groupA);
+	}
+
+	// VaultUpdateHandler interface implementation
+	handleFileCreate(file: TAbstractFile, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Only handle files in the current folder or its children
+		if (!this.isFileInCurrentFolder(file)) return;
+		
+		if (file instanceof TFile) {
+			const groupName = this.getTargetGroup(file);
+			this.addFileItem(file, groupName);
+		}
+	}
+
+	handleFileDelete(file: TAbstractFile, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Only handle files that were in the current folder or its children
+		if (!this.isFileInCurrentFolder(file)) return;
+		
+		if (file instanceof TFile) {
+			this.removeFileItem(file);
+		}
+	}
+
+	handleFileRename(file: TAbstractFile, oldPath: string, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Check if file was or is now in current folder
+		const wasInFolder = this.isPathInCurrentFolder(oldPath);
+		const isInFolder = this.isFileInCurrentFolder(file);
+		
+		if (file instanceof TFile) {
+			if (wasInFolder && isInFolder) {
+				// File was renamed within current folder
+				const oldGroupName = this.getTargetGroupFromPath(oldPath);
+				const newGroupName = this.getTargetGroup(file);
+				
+				if (oldGroupName === newGroupName) {
+					// Same group, just update the file item
+					this.updateFileItem(file);
+				} else {
+					// Different group, move the file
+					this.moveFileItem(file, oldGroupName, newGroupName);
+				}
+			} else if (wasInFolder && !isInFolder) {
+				// File was moved out of current folder
+				this.removeFileItem(file);
+			} else if (!wasInFolder && isInFolder) {
+				// File was moved into current folder
+				const groupName = this.getTargetGroup(file);
+				this.addFileItem(file, groupName);
+			}
+		}
+	}
+
+	handleFileModify(file: TAbstractFile, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Only handle files in the current folder or its children
+		if (!this.isFileInCurrentFolder(file)) return;
+		
+		if (file instanceof TFile) {
+			const currentGroupName = this.getCurrentGroupForFile(file);
+			const targetGroupName = this.getTargetGroup(file);
+			
+			if (currentGroupName === targetGroupName) {
+				// Same group, just update the file item
+				this.updateFileItem(file);
+			} else {
+				// Different group due to modification time change
+				this.moveFileItem(file, currentGroupName, targetGroupName);
+			}
+		}
+	}
+
+	private getTargetGroupFromPath(filePath: string): string {
+		// This is a simplified version - in a real implementation,
+		// we'd need to get the modification time from the old file
+		// For now, assume it stays in the same group
+		const elements = this.fileElements.get(filePath);
+		if (elements) {
+			// Find which group this element belongs to
+			for (const [groupName, groupElements] of this.groupElements.entries()) {
+				if (groupElements.groupContainer.contains(elements.container)) {
+					return groupName;
+				}
+			}
+		}
+		return 'Today'; // fallback
+	}
+
+	private getCurrentGroupForFile(file: TFile): string {
+		const elements = this.fileElements.get(file.path);
+		if (elements) {
+			// Find which group this element belongs to
+			for (const [groupName, groupElements] of this.groupElements.entries()) {
+				if (groupElements.groupContainer.contains(elements.container)) {
+					return groupName;
+				}
+			}
+		}
+		return this.getTargetGroup(file); // fallback to calculated group
 	}
 }
