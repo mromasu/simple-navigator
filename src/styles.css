@@ -117,6 +117,21 @@ If your plugin does not need CSS, delete this file.
 	overflow: hidden;
 }
 
+/* Root header styling */
+.folder-item.root-header {
+	margin-bottom: 8px;
+}
+
+.folder-item.root-header .folder-header {
+	font-weight: 600;
+	background-color: var(--background-secondary);
+	border-radius: 6px;
+}
+
+.folder-item.root-header .folder-header:hover {
+	background-color: var(--background-secondary);
+}
+
 /* Motion sensitivity support */
 @media (prefers-reduced-motion: reduce) {
 	.folder-children {

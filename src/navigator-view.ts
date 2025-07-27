@@ -95,7 +95,46 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		this.calculateFolderCounts();
 		
 		const rootFolder = this.app.vault.getRoot();
-		this.renderFolder(rootFolder, container, 0);
+		
+		// Render root folder as a non-collapsible header
+		this.renderRootHeader(rootFolder, container);
+		
+		// Render root's subfolders directly at depth 0
+		const subfolders = rootFolder.children.filter(child => child instanceof TFolder) as TFolder[];
+		subfolders.sort((a, b) => a.name.localeCompare(b.name));
+		
+		for (const subfolder of subfolders) {
+			this.renderFolder(subfolder, container, 0);
+		}
+	}
+
+	private renderRootHeader(rootFolder: TFolder, container: HTMLElement): void {
+		const rootEl = container.createEl('div', { cls: 'folder-item root-header' });
+		rootEl.setAttribute('data-folder-path', rootFolder.path);
+		
+		const rootHeader = rootEl.createEl('div', { cls: 'folder-header' });
+		
+		// Root folder icon (always closed folder icon since it's not collapsible)
+		const folderIconContainer = rootHeader.createEl('span', { cls: 'folder-icon' });
+		const folderIcon = this.getFolderIcon(false, true);
+		folderIconContainer.appendChild(folderIcon);
+		
+		// Root folder name
+		const folderName = rootHeader.createEl('span', { cls: 'folder-name' });
+		folderName.textContent = 'Notes';
+		
+		// Root folder note count
+		const noteCount = this.folderCounts.get(rootFolder.path) || 0;
+		const countEl = rootHeader.createEl('span', { cls: 'folder-count' });
+		countEl.textContent = noteCount.toString();
+		
+		// Store element references for updates (no chevron or children for root)
+		this.folderElements.set(rootFolder.path, {
+			container: rootEl,
+			header: rootHeader,
+			icon: folderIconContainer,
+			count: countEl
+		});
 	}
 
 	private renderFolder(folder: TFolder, parent: HTMLElement, depth: number): void {
@@ -113,7 +152,7 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		folderIconContainer.appendChild(folderIcon);
 		
 		const folderName = folderHeader.createEl('span', { cls: 'folder-name' });
-		folderName.textContent = folder.isRoot() ? 'Notes' : folder.name;
+		folderName.textContent = folder.name;
 		
 		const noteCount = this.folderCounts.get(folder.path) || 0;
 		const countEl = folderHeader.createEl('span', { cls: 'folder-count' });
