@@ -164,8 +164,10 @@ If your plugin does not need CSS, delete this file.
 }
 
 /* Folder container styles */
-.mod-left-extend {
-	width: 300px;
+.workspace-split.mod-horizontal.mod-sidedock.mod-left-extend {
+	width: 300px !important;
+	flex: none !important;
+	height: auto !important;
 	border-right: 1px solid var(--background-modifier-border);
 	background: var(--background-primary);
 	position: relative;
