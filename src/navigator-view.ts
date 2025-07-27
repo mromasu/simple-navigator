@@ -1,5 +1,7 @@
 import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
+import { FolderContainerManager } from './folder-container-manager';
+import MyPlugin from './main';
 
 export const NAVIGATOR_VIEW_TYPE = 'navigator-view';
 
@@ -16,9 +18,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	private expandedFolders: Set<string> = new Set();
 	private folderCounts: Map<string, number> = new Map();
 	private folderElements: Map<string, FolderElements> = new Map();
+	private containerManager: FolderContainerManager;
 
-	constructor(leaf: WorkspaceLeaf) {
+	constructor(leaf: WorkspaceLeaf, private plugin: MyPlugin) {
 		super(leaf);
+		this.containerManager = new FolderContainerManager(this.app, plugin);
 	}
 
 	getViewType(): string {
@@ -51,6 +55,8 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	async onClose(): Promise<void> {
 		// Unregister from VaultObserver
 		VaultObserver.getInstance(this.app).unregisterView(this);
+		// Clean up container manager
+		this.containerManager.cleanup();
 	}
 
 	private createLucideIcon(pathData: string, className: string = ''): SVGSVGElement {
@@ -150,6 +156,15 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		folderEl.setAttribute('data-folder-path', folder.path);
 		
 		const folderHeader = folderEl.createEl('div', { cls: 'folder-header' });
+		
+		// Add click handler for folder header (not chevron)
+		folderHeader.addEventListener('click', (e) => {
+			// Prevent if clicking chevron
+			const target = e.target as HTMLElement;
+			if (target && !target.closest('.folder-chevron-container')) {
+				this.containerManager.openContainer(folder);
+			}
+		});
 		
 		const hasChildren = folder.children.some(child => child instanceof TFolder);
 		const isExpanded = this.expandedFolders.has(folder.path);

@@ -163,6 +163,43 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-modifier-hover);
 }
 
+/* Folder container styles */
+.mod-left-extend {
+	width: 300px;
+	border-right: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	position: relative;
+	z-index: 10;
+}
+
+.folder-container-header {
+	padding: 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.folder-container-title {
+	text-align: center;
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--text-normal);
+	margin: 0;
+}
+
+.resize-handle {
+	width: 4px;
+	position: absolute;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	cursor: col-resize;
+	background: transparent;
+	z-index: 100;
+}
+
+.resize-handle:hover {
+	background: var(--interactive-accent);
+}
+
 /* Motion sensitivity support */
 @media (prefers-reduced-motion: reduce) {
 	.folder-children {

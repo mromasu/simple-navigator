@@ -7,10 +7,12 @@ import './styles.css';
 
 interface MyPluginSettings {
 	mySetting: string;
+	folderContainerWidth: number;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+	mySetting: 'default',
+	folderContainerWidth: 300
 }
 
 export default class MyPlugin extends Plugin {
@@ -25,7 +27,7 @@ export default class MyPlugin extends Plugin {
 		// Register the navigator view
 		this.registerView(
 			NAVIGATOR_VIEW_TYPE,
-			(leaf) => new NavigatorView(leaf)
+			(leaf) => new NavigatorView(leaf, this)
 		);
 
 		// Open navigator view in left sidebar if not already present
