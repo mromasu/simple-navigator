@@ -186,14 +186,23 @@ If your plugin does not need CSS, delete this file.
 }
 
 .resize-handle {
-	width: 4px;
 	position: absolute;
 	right: 0;
-	top: 0;
+	top: unset;
 	bottom: 0;
+	width: var(--divider-width-hover);
+	height: var(--divider-vertical-height);
 	cursor: col-resize;
-	background: transparent;
-	z-index: 100;
+	background-color: transparent;
+	z-index: var(--layer-cover);
+	border-inline-end-style: solid;
+	border-inline-end-width: var(--divider-width);
+	border-color: var(--divider-color);
+	border-top: 0;
+	border-width: var(--divider-width);
+	margin: 0;
+	transition: background-color 200ms ease-in-out, border-color 200ms ease-in-out, opacity 200ms ease-in-out;
+	-webkit-app-region: no-drag;
 }
 
 .resize-handle:hover {
