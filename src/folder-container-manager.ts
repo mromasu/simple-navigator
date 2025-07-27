@@ -25,16 +25,6 @@ export class FolderContainerManager {
 			}
 		});
 
-		// Handle click outside to close container
-		document.addEventListener('click', (e) => {
-			if (this.container && !this.container.contains(e.target as Node)) {
-				// Don't close if clicking on navigator elements
-				const navigatorView = document.querySelector('.navigator-view');
-				if (!navigatorView?.contains(e.target as Node)) {
-					this.closeContainer();
-				}
-			}
-		});
 	}
 
 	openContainer(folder: TFolder): void {
@@ -75,6 +65,9 @@ export class FolderContainerManager {
 		const closeButton = header.createEl('button', { cls: 'folder-container-close' });
 		closeButton.innerHTML = '×';
 		closeButton.addEventListener('click', () => this.closeContainer());
+
+		// Create content container
+		const content = this.container.createEl('div', { cls: 'folder-container-content' });
 
 		// Create resize handle
 		this.resizeHandle = this.container.createEl('div', { cls: 'resize-handle' });

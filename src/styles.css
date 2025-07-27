@@ -172,6 +172,8 @@ If your plugin does not need CSS, delete this file.
 	background: var(--background-primary);
 	position: relative;
 	z-index: 10;
+	display: flex;
+	flex-direction: column;
 }
 
 .folder-container-header {
@@ -191,7 +193,8 @@ If your plugin does not need CSS, delete this file.
 	margin: 0;
 }
 
-.folder-container-close {
+.mod-left-extend
+button.folder-container-close {
 	background: none;
 	border: none;
 	font-size: 20px;
@@ -200,11 +203,18 @@ If your plugin does not need CSS, delete this file.
 	padding: 4px 8px;
 	border-radius: 4px;
 	transition: background-color 0.1s ease, color 0.1s ease;
+	box-shadow: none;
 }
 
 .folder-container-close:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
+}
+
+.folder-container-content {
+	flex: 1 0 auto;
+	overflow-y: auto;
+	padding: 16px;
 }
 
 .workspace-split.mod-horizontal.mod-sidedock.mod-left-extend .resize-handle {
