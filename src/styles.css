@@ -222,7 +222,7 @@ button.folder-container-close {
 
 /* File List Styling */
 .file-list-group {
-	margin-bottom: 24px;
+	margin-bottom: 16px;
 }
 
 .file-list-group:last-child {
@@ -230,19 +230,19 @@ button.folder-container-close {
 }
 
 .file-list-group-header {
-	font-size: 20px;
+	font-size: 16px;
 	font-weight: 600;
 	color: var(--text-normal);
-	margin: 0 0 12px 0;
+	margin: 0 0 8px 0;
 	padding: 0;
 }
 
 .file-card {
 	background: var(--background-primary);
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 8px;
-	padding: 12px;
-	margin-bottom: 8px;
+	border-radius: 6px;
+	padding: 8px;
+	margin-bottom: 6px;
 	cursor: pointer;
 	transition: background-color 0.1s ease, box-shadow 0.1s ease;
 }
@@ -257,25 +257,25 @@ button.folder-container-close {
 }
 
 .file-card-content {
-	margin-bottom: 8px;
+	margin-bottom: 6px;
 }
 
 .file-card-title {
-	font-size: 16px;
+	font-size: 15px;
 	font-weight: 600;
 	color: var(--text-normal);
-	margin-bottom: 4px;
+	margin-bottom: 2px;
 	line-height: 1.3;
 }
 
 .file-card-preview {
-	font-size: 14px;
+	font-size: 13px;
 	color: var(--text-muted);
 	line-height: 1.4;
 	overflow: hidden;
 	display: -webkit-box;
-	-webkit-line-clamp: 2;
-	line-clamp: 2;
+	-webkit-line-clamp: 1;
+	line-clamp: 1;
 	-webkit-box-orient: vertical;
 }
 

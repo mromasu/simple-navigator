@@ -255,10 +255,6 @@ export class FolderContainerManager {
 		// Card metadata
 		const meta = card.createEl('div', { cls: 'file-card-meta' });
 		
-		// Time
-		const time = meta.createEl('span', { cls: 'file-card-time' });
-		time.textContent = this.formatFileTime(file.stat.mtime);
-		
 		// Folder badge (if not in root)
 		if (!file.parent?.isRoot()) {
 			const folder = meta.createEl('span', { cls: 'file-card-folder' });
