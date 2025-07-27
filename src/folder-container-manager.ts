@@ -313,9 +313,18 @@ export class FolderContainerManager {
 		// Remove blockquotes
 		sanitized = sanitized.replace(/^>\s*/gm, '');
 
-		// Remove horizontal rules
-		sanitized = sanitized.replace(/^---+$/gm, '');
-		sanitized = sanitized.replace(/^\*\*\*+$/gm, '');
+		// Remove arrows and connectors
+		sanitized = sanitized.replace(/-{2,}>/g, ''); // ---> arrows
+		sanitized = sanitized.replace(/->/g, ''); // -> arrows
+		sanitized = sanitized.replace(/<-+/g, ''); // <-- arrows
+		sanitized = sanitized.replace(/={2,}>/g, ''); // ===> arrows
+		sanitized = sanitized.replace(/=>/g, ''); // => arrows
+
+		// Remove horizontal rules and dividers
+		sanitized = sanitized.replace(/^-{3,}$/gm, ''); // --- dividers
+		sanitized = sanitized.replace(/^={3,}$/gm, ''); // === dividers
+		sanitized = sanitized.replace(/^\*{3,}$/gm, ''); // *** dividers
+		sanitized = sanitized.replace(/^_{3,}$/gm, ''); // ___ dividers
 
 		// Remove tables (basic cleanup)
 		sanitized = sanitized.replace(/\|/g, ' ');
