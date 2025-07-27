@@ -84,14 +84,12 @@ export class VaultObserver {
 
 		this.eventRefs.push(
 			this.app.vault.on('modify', (file) => {
-				// Only process modify events for structure changes, not content changes
-				if (file instanceof TFolder) {
-					this.queueChange({
-						type: 'modify',
-						file,
-						affectedFolders: this.calculateAffectedFolders(file)
-					});
-				}
+				// Process all modify events, let views filter what's relevant
+				this.queueChange({
+					type: 'modify',
+					file,
+					affectedFolders: this.calculateAffectedFolders(file)
+				});
 			})
 		);
 	}

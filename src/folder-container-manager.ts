@@ -726,11 +726,14 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		if (!this.isFileInCurrentFolder(file)) return;
 		
 		if (file instanceof TFile) {
+			// Only process files that are currently displayed in the container
+			if (!this.fileElements.has(file.path)) return;
+			
 			const currentGroupName = this.getCurrentGroupForFile(file);
 			const targetGroupName = this.getTargetGroup(file);
 			
 			if (currentGroupName === targetGroupName) {
-				// Same group, just update the file item
+				// Same group, just update the file item (preview content, etc.)
 				this.updateFileItem(file);
 			} else {
 				// Different group due to modification time change
