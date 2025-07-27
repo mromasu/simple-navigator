@@ -232,37 +232,45 @@ export class FolderContainerManager {
 		const header = group.createEl('h3', { cls: 'file-list-group-header' });
 		header.textContent = groupName;
 		
-		// File cards
-		for (const file of files) {
-			this.renderFileCard(group, file);
+		// Group container
+		const container = group.createEl('div', { cls: 'file-list-group-container' });
+		
+		// File items
+		for (let i = 0; i < files.length; i++) {
+			this.renderFileItem(container, files[i]);
+			
+			// Add divider after each item except the last
+			if (i < files.length - 1) {
+				container.createEl('div', { cls: 'file-item-divider' });
+			}
 		}
 	}
 
-	private renderFileCard(container: HTMLElement, file: TFile): void {
-		const card = container.createEl('div', { cls: 'file-card' });
+	private renderFileItem(container: HTMLElement, file: TFile): void {
+		const item = container.createEl('div', { cls: 'file-item' });
 		
-		// Card content
-		const cardContent = card.createEl('div', { cls: 'file-card-content' });
+		// Item content
+		const itemContent = item.createEl('div', { cls: 'file-item-content' });
 		
 		// File name
-		const fileName = cardContent.createEl('div', { cls: 'file-card-title' });
+		const fileName = itemContent.createEl('div', { cls: 'file-item-title' });
 		fileName.textContent = file.basename;
 		
 		// File preview
-		const preview = cardContent.createEl('div', { cls: 'file-card-preview' });
+		const preview = itemContent.createEl('div', { cls: 'file-item-preview' });
 		this.setFilePreview(preview, file);
 		
-		// Card metadata
-		const meta = card.createEl('div', { cls: 'file-card-meta' });
+		// Item metadata
+		const meta = item.createEl('div', { cls: 'file-item-meta' });
 		
 		// Folder badge (if not in root)
 		if (!file.parent?.isRoot()) {
-			const folder = meta.createEl('span', { cls: 'file-card-folder' });
+			const folder = meta.createEl('span', { cls: 'file-item-folder' });
 			folder.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 		}
 		
 		// Click handler
-		card.addEventListener('click', () => {
+		item.addEventListener('click', () => {
 			this.app.workspace.openLinkText(file.path, '', false);
 		});
 	}
