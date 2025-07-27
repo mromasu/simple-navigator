@@ -274,17 +274,63 @@ export class FolderContainerManager {
 	private async setFilePreview(element: HTMLElement, file: TFile): Promise<void> {
 		try {
 			const content = await this.app.vault.read(file);
-			const preview = content
-				.replace(/^#+ .*$/gm, '') // Remove headings
-				.replace(/\[\[.*?\]\]/g, '') // Remove links
-				.replace(/[*_`]/g, '') // Remove markdown formatting
-				.trim()
-				.substring(0, 100);
+			const preview = this.sanitizeContent(content);
 			
 			element.textContent = preview || 'No preview available';
 		} catch {
 			element.textContent = 'No preview available';
 		}
+	}
+
+	private sanitizeContent(content: string): string {
+		let sanitized = content;
+
+		// Remove YAML frontmatter
+		sanitized = sanitized.replace(/^---[\s\S]*?---\n?/m, '');
+
+		// Remove HTML tags
+		sanitized = sanitized.replace(/<[^>]*>/g, '');
+
+		// Remove headings
+		sanitized = sanitized.replace(/^#{1,6}\s+.*$/gm, '');
+
+		// Remove code blocks
+		sanitized = sanitized.replace(/```[\s\S]*?```/g, '');
+		sanitized = sanitized.replace(/`[^`]*`/g, '');
+
+		// Remove links and references
+		sanitized = sanitized.replace(/\[\[.*?\]\]/g, ''); // Wiki links
+		sanitized = sanitized.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'); // Markdown links
+		sanitized = sanitized.replace(/!\[([^\]]*)\]\([^)]*\)/g, ''); // Images
+
+		// Remove emphasis and formatting
+		sanitized = sanitized.replace(/\*\*([^*]*)\*\*/g, '$1'); // Bold
+		sanitized = sanitized.replace(/\*([^*]*)\*/g, '$1'); // Italic
+		sanitized = sanitized.replace(/__([^_]*)__/g, '$1'); // Bold underscore
+		sanitized = sanitized.replace(/_([^_]*)_/g, '$1'); // Italic underscore
+		sanitized = sanitized.replace(/~~([^~]*)~~/g, '$1'); // Strikethrough
+
+		// Remove list markers
+		sanitized = sanitized.replace(/^[\s]*[-*+]\s+/gm, '');
+		sanitized = sanitized.replace(/^[\s]*\d+\.\s+/gm, '');
+
+		// Remove blockquotes
+		sanitized = sanitized.replace(/^>\s*/gm, '');
+
+		// Remove horizontal rules
+		sanitized = sanitized.replace(/^---+$/gm, '');
+		sanitized = sanitized.replace(/^\*\*\*+$/gm, '');
+
+		// Remove tables (basic cleanup)
+		sanitized = sanitized.replace(/\|/g, ' ');
+
+		// Clean up extra whitespace
+		sanitized = sanitized.replace(/\n\s*\n/g, ' '); // Multiple newlines
+		sanitized = sanitized.replace(/\s+/g, ' '); // Multiple spaces
+		sanitized = sanitized.trim();
+
+		// Return first 100 characters
+		return sanitized.substring(0, 100);
 	}
 
 	private formatFileTime(timestamp: number): string {
