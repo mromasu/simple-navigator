@@ -128,12 +128,19 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		const countEl = rootHeader.createEl('span', { cls: 'folder-count' });
 		countEl.textContent = noteCount.toString();
 		
-		// Store element references for updates (no chevron or children for root)
+		// Add non-interactive chevron for aesthetic consistency
+		const chevronContainer = rootHeader.createEl('span', { cls: 'folder-chevron-container non-clickable' });
+		const chevron = this.getChevronIcon(false);
+		chevron.addClass('non-interactive');
+		chevronContainer.appendChild(chevron);
+		
+		// Store element references for updates (no children for root)
 		this.folderElements.set(rootFolder.path, {
 			container: rootEl,
 			header: rootHeader,
 			icon: folderIconContainer,
-			count: countEl
+			count: countEl,
+			chevron: chevronContainer
 		});
 	}
 
