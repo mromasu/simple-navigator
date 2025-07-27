@@ -1,7 +1,8 @@
 import { App, TFolder, TFile, TAbstractFile, Vault } from 'obsidian';
+import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import MyPlugin from './main';
 
-export class FolderContainerManager {
+export class FolderContainerManager implements VaultUpdateHandler {
 	private app: App;
 	private plugin: MyPlugin;
 	private container: HTMLElement | null = null;
@@ -27,10 +28,16 @@ export class FolderContainerManager {
 
 		this.currentFolder = folder;
 		this.createContainer();
+		
+		// Register with VaultObserver for file system events
+		VaultObserver.getInstance(this.app).registerView(this);
 	}
 
 	closeContainer(): void {
 		if (this.container) {
+			// Unregister from VaultObserver
+			VaultObserver.getInstance(this.app).unregisterView(this);
+			
 			this.container.remove();
 			this.container = null;
 			this.currentFolder = null;
@@ -127,6 +134,10 @@ export class FolderContainerManager {
 	};
 
 	cleanup(): void {
+		// Unregister from VaultObserver before closing
+		if (this.container) {
+			VaultObserver.getInstance(this.app).unregisterView(this);
+		}
 		this.closeContainer();
 		// Remove event listeners would go here if we had stored references
 	}
@@ -363,6 +374,93 @@ export class FolderContainerManager {
 				day: 'numeric', 
 				year: '2-digit' 
 			});
+		}
+	}
+
+	// VaultUpdateHandler interface implementation
+	handleFileCreate(file: TAbstractFile, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Only handle files in the current folder or its children
+		if (!this.isFileInCurrentFolder(file)) return;
+		
+		if (file instanceof TFile) {
+			this.refreshFileList();
+		}
+	}
+
+	handleFileDelete(file: TAbstractFile, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Only handle files that were in the current folder or its children
+		if (!this.isFileInCurrentFolder(file)) return;
+		
+		if (file instanceof TFile) {
+			this.refreshFileList();
+		}
+	}
+
+	handleFileRename(file: TAbstractFile, oldPath: string, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Check if file was or is now in current folder
+		const wasInFolder = this.isPathInCurrentFolder(oldPath);
+		const isInFolder = this.isFileInCurrentFolder(file);
+		
+		if ((wasInFolder || isInFolder) && file instanceof TFile) {
+			this.refreshFileList();
+		}
+	}
+
+	handleFileModify(file: TAbstractFile, affectedFolders: string[]): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		// Only handle files in the current folder or its children
+		if (!this.isFileInCurrentFolder(file)) return;
+		
+		if (file instanceof TFile) {
+			this.refreshFileList();
+		}
+	}
+
+	private isFileInCurrentFolder(file: TAbstractFile): boolean {
+		if (!this.currentFolder) return false;
+		
+		if (this.currentFolder.isRoot()) {
+			// For root folder: check all files in vault
+			return true;
+		} else {
+			// For specific folder: check if file is in this folder or its children
+			let current = file.parent;
+			while (current) {
+				if (current === this.currentFolder) {
+					return true;
+				}
+				current = current.parent;
+			}
+			return false;
+		}
+	}
+
+	private isPathInCurrentFolder(path: string): boolean {
+		if (!this.currentFolder) return false;
+		
+		if (this.currentFolder.isRoot()) {
+			// For root folder: all paths are relevant
+			return true;
+		} else {
+			// For specific folder: check if path starts with folder path
+			return path.startsWith(this.currentFolder.path + '/') || path === this.currentFolder.path;
+		}
+	}
+
+	private refreshFileList(): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		const content = this.container.querySelector('.folder-container-content');
+		if (content) {
+			content.empty();
+			this.renderFileList(content as HTMLElement);
 		}
 	}
 }
