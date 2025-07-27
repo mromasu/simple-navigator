@@ -175,9 +175,10 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		chevronElement = chevronContainer;
 		
 		if (hasChildren) {
-			// Interactive chevron for folders with children
+			// Interactive chevron and count for folders with children
 			chevron.addClass('interactive');
 			chevronContainer.addClass('clickable');
+			countEl.addClass('interactive');
 			
 			chevronContainer.addEventListener('click', (e) => {
 				e.stopPropagation();
@@ -200,9 +201,10 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			}
 			// Note: collapsed state is handled by default CSS Grid state (0fr)
 		} else {
-			// Non-interactive chevron for folders without children (decorative only)
+			// Non-interactive chevron and count for folders without children (decorative only)
 			chevron.addClass('non-interactive');
 			chevronContainer.addClass('non-clickable');
+			countEl.addClass('non-interactive');
 		}
 		
 		// Store element references for smart updates

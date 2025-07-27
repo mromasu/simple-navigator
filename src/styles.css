@@ -70,17 +70,29 @@ If your plugin does not need CSS, delete this file.
 	transform: rotate(0deg);
 }
 
-/* Interactive chevrons - with accent color and hover effects */
+/* Interactive chevrons - with accent color, bold weight, and hover effects */
 .folder-chevron.interactive {
 	color: var(--interactive-accent);
+	font-weight: 600;
 }
 
 .folder-chevron-container.clickable:hover .folder-chevron.interactive {
 	color: var(--interactive-accent-hover);
 }
 
+/* Interactive counts - with accent color and bold weight */
+.folder-count.interactive {
+	color: var(--interactive-accent);
+	font-weight: 600;
+}
+
 /* Non-interactive chevrons - muted and static */
 .folder-chevron.non-interactive {
+	color: var(--text-faint);
+}
+
+/* Non-interactive counts - muted and static */
+.folder-count.non-interactive {
 	color: var(--text-faint);
 }
 
