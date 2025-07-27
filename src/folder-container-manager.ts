@@ -1,4 +1,4 @@
-import { App, TFolder } from 'obsidian';
+import { App, TFolder, TFile, TAbstractFile, Vault } from 'obsidian';
 import MyPlugin from './main';
 
 export class FolderContainerManager {
@@ -68,6 +68,9 @@ export class FolderContainerManager {
 
 		// Create content container
 		const content = this.container.createEl('div', { cls: 'folder-container-content' });
+		
+		// Render file list
+		this.renderFileList(content);
 
 		// Create resize handle
 		this.resizeHandle = this.container.createEl('div', { cls: 'resize-handle' });
@@ -132,5 +135,181 @@ export class FolderContainerManager {
 	cleanup(): void {
 		this.closeContainer();
 		// Remove event listeners would go here if we had stored references
+	}
+
+	private renderFileList(content: HTMLElement): void {
+		if (!this.currentFolder) return;
+
+		// Get files based on folder type
+		const files = this.getFiles();
+		
+		// Group files by date
+		const groupedFiles = this.groupFilesByDate(files);
+		
+		// Render each group
+		for (const [groupName, groupFiles] of Object.entries(groupedFiles)) {
+			if (groupFiles.length === 0) continue;
+			
+			this.renderFileGroup(content, groupName, groupFiles);
+		}
+	}
+
+	private getFiles(): TFile[] {
+		if (!this.currentFolder) return [];
+
+		const files: TFile[] = [];
+
+		if (this.currentFolder.isRoot()) {
+			// For root folder: only direct children (no recursion)
+			for (const child of this.currentFolder.children) {
+				if (child instanceof TFile) {
+					files.push(child);
+				}
+			}
+		} else {
+			// For sub-folders: get all files recursively
+			Vault.recurseChildren(this.currentFolder, (file: TAbstractFile) => {
+				if (file instanceof TFile) {
+					files.push(file);
+				}
+			});
+		}
+
+		// Sort by modification time (newest first)
+		return files.sort((a, b) => b.stat.mtime - a.stat.mtime);
+	}
+
+	private groupFilesByDate(files: TFile[]): Record<string, TFile[]> {
+		const groups: Record<string, TFile[]> = {
+			'Today': [],
+			'Yesterday': [],
+		};
+
+		const now = new Date();
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+
+		for (const file of files) {
+			const fileDate = new Date(file.stat.mtime);
+			const fileDateOnly = new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate());
+
+			if (fileDateOnly.getTime() === today.getTime()) {
+				groups['Today'].push(file);
+			} else if (fileDateOnly.getTime() === yesterday.getTime()) {
+				groups['Yesterday'].push(file);
+			} else {
+				const groupKey = this.formatDateGroup(fileDate);
+				if (!groups[groupKey]) {
+					groups[groupKey] = [];
+				}
+				groups[groupKey].push(file);
+			}
+		}
+
+		return groups;
+	}
+
+	private formatDateGroup(date: Date): string {
+		const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+			'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+		
+		const day = date.getDate();
+		const month = months[date.getMonth()];
+		const year = date.getFullYear();
+		const currentYear = new Date().getFullYear();
+		
+		if (year === currentYear) {
+			return `${day} ${month}`;
+		} else {
+			return `${day} ${month} ${year}`;
+		}
+	}
+
+	private renderFileGroup(content: HTMLElement, groupName: string, files: TFile[]): void {
+		const group = content.createEl('div', { cls: 'file-list-group' });
+		
+		// Group header
+		const header = group.createEl('h3', { cls: 'file-list-group-header' });
+		header.textContent = groupName;
+		
+		// File cards
+		for (const file of files) {
+			this.renderFileCard(group, file);
+		}
+	}
+
+	private renderFileCard(container: HTMLElement, file: TFile): void {
+		const card = container.createEl('div', { cls: 'file-card' });
+		
+		// Card content
+		const cardContent = card.createEl('div', { cls: 'file-card-content' });
+		
+		// File name
+		const fileName = cardContent.createEl('div', { cls: 'file-card-title' });
+		fileName.textContent = file.basename;
+		
+		// File preview
+		const preview = cardContent.createEl('div', { cls: 'file-card-preview' });
+		this.setFilePreview(preview, file);
+		
+		// Card metadata
+		const meta = card.createEl('div', { cls: 'file-card-meta' });
+		
+		// Time
+		const time = meta.createEl('span', { cls: 'file-card-time' });
+		time.textContent = this.formatFileTime(file.stat.mtime);
+		
+		// Folder badge (if not in root)
+		if (!file.parent?.isRoot()) {
+			const folder = meta.createEl('span', { cls: 'file-card-folder' });
+			folder.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
+		}
+		
+		// Click handler
+		card.addEventListener('click', () => {
+			this.app.workspace.openLinkText(file.path, '', false);
+		});
+	}
+
+	private async setFilePreview(element: HTMLElement, file: TFile): Promise<void> {
+		try {
+			const content = await this.app.vault.read(file);
+			const preview = content
+				.replace(/^#+ .*$/gm, '') // Remove headings
+				.replace(/\[\[.*?\]\]/g, '') // Remove links
+				.replace(/[*_`]/g, '') // Remove markdown formatting
+				.trim()
+				.substring(0, 100);
+			
+			element.textContent = preview || 'No preview available';
+		} catch {
+			element.textContent = 'No preview available';
+		}
+	}
+
+	private formatFileTime(timestamp: number): string {
+		const date = new Date(timestamp);
+		const now = new Date();
+		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+		const fileDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+		
+		if (fileDate.getTime() === today.getTime()) {
+			// Today: show time like "3:12 PM"
+			return date.toLocaleTimeString('en-US', { 
+				hour: 'numeric', 
+				minute: '2-digit',
+				hour12: true 
+			});
+		} else if (fileDate.getTime() === today.getTime() - 24 * 60 * 60 * 1000) {
+			// Yesterday: show "Yesterday"
+			return 'Yesterday';
+		} else {
+			// Older: show date like "10/1/24"
+			return date.toLocaleDateString('en-US', { 
+				month: 'numeric', 
+				day: 'numeric', 
+				year: '2-digit' 
+			});
+		}
 	}
 }
