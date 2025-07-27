@@ -69,7 +69,12 @@ export class FolderContainerManager {
 		// Create header
 		const header = this.container.createEl('div', { cls: 'folder-container-header' });
 		const title = header.createEl('h2', { cls: 'folder-container-title' });
-		title.textContent = this.currentFolder.name;
+		title.textContent = this.currentFolder.isRoot() ? 'Notes' : this.currentFolder.name;
+
+		// Create close button
+		const closeButton = header.createEl('button', { cls: 'folder-container-close' });
+		closeButton.innerHTML = '×';
+		closeButton.addEventListener('click', () => this.closeContainer());
 
 		// Create resize handle
 		this.resizeHandle = this.container.createEl('div', { cls: 'resize-handle' });
