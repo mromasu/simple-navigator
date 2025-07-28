@@ -1347,10 +1347,11 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 		// Move file
 		menu.addItem((item) => {
-			item.setTitle('Move to folder')
+			item.setTitle('Move file to another folder')
 				.setIcon('folder-open')
 				.onClick(() => {
-					this.moveFilePrompt(file);
+					// Execute Obsidian's native move file command
+					(this.app as any).commands.executeCommandById('file-explorer:move-file');
 				});
 		});
 
@@ -1393,34 +1394,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
-	private async moveFilePrompt(file: TFile): Promise<void> {
-		// Get all folders in the vault
-		const folders = this.app.vault.getAllLoadedFiles()
-			.filter(f => f instanceof TFolder) as TFolder[];
-		
-		const folderNames = folders.map(f => f.path === '' ? 'Root' : f.path);
-		const currentFolder = file.parent?.path || 'Root';
-		
-		const modal = new TextInputModal(
-			this.app, 
-			'Move File', 
-			`Move "${file.basename}" to folder.\n\nAvailable folders:\n${folderNames.join(', ')}\n\nEnter folder path:`, 
-			currentFolder
-		);
-		const selectedFolder = await modal.openAndGetValue();
-		
-		if (selectedFolder !== null && selectedFolder !== currentFolder && selectedFolder.trim() !== '') {
-			const targetPath = selectedFolder.trim() === 'Root' || selectedFolder.trim() === '' 
-				? file.name 
-				: `${selectedFolder.trim()}/${file.name}`;
-			
-			try {
-				await this.app.vault.rename(file, targetPath);
-			} catch (error) {
-				console.error('Failed to move file:', error);
-			}
-		}
-	}
 
 	private async deleteFilePrompt(file: TFile): Promise<void> {
 		try {
