@@ -190,7 +190,8 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 }
 
 .folder-item.root-header .folder-header:hover {
-	background-color: var(--background-modifier-hover);
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
 }
 
 /* All Notes styling - default subtle appearance */
@@ -405,6 +406,7 @@ button.folder-container-new-note {
 	gap: 8px;
 	font-size: 12px;
 	color: var(--text-faint);
+	margin-top: 8px;
 }
 
 .file-item-folder {
