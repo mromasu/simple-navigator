@@ -794,13 +794,13 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Update preview and image using coordinated loading
 		await this.loadFileContent(file, elements.preview, elements.image);
 		
-		// Update folder badge (only if NOT in All Notes mode)
+		// Update folder badge (should match renderFileItem logic)
 		if (elements.folderBadge) {
 			elements.folderBadge.remove();
 			elements.folderBadge = undefined;
 		}
-		
-		if (!this.isAllNotesMode && elements.meta && !file.parent?.isRoot()) {
+
+		if (this.isAllNotesMode && elements.meta && !file.parent?.isRoot()) {
 			const folderBadge = elements.meta.createEl('span', { cls: 'file-item-folder' });
 			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 			elements.folderBadge = folderBadge;
