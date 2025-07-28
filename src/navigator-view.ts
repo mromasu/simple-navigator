@@ -1,9 +1,72 @@
-import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault, Notice, Menu } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault, Notice, Menu, Modal, Setting, App } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import { FolderContainerManager } from './folder-container-manager';
 import MyPlugin from './main';
 
 export const NAVIGATOR_VIEW_TYPE = 'navigator-view';
+
+export class TextInputModal extends Modal {
+	private result: string | null = null;
+	private submitted = false;
+
+	constructor(app: App, private title: string, private placeholder: string, private defaultValue: string = '') {
+		super(app);
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: this.title });
+
+		new Setting(contentEl)
+			.addText((text) => {
+				text.setPlaceholder(this.placeholder)
+					.setValue(this.defaultValue)
+					.onChange((value) => {
+						this.result = value;
+					});
+				
+				// Focus the input and select text if there's a default value
+				setTimeout(() => {
+					text.inputEl.focus();
+					if (this.defaultValue) {
+						text.inputEl.select();
+					}
+				}, 10);
+			});
+
+		new Setting(contentEl)
+			.addButton((btn) => {
+				btn.setButtonText('Cancel')
+					.onClick(() => {
+						this.close();
+					});
+			})
+			.addButton((btn) => {
+				btn.setButtonText('Submit')
+					.setCta()
+					.onClick(() => {
+						this.submitted = true;
+						this.close();
+					});
+			});
+	}
+
+	onClose() {
+		const { contentEl } = this;
+		contentEl.empty();
+	}
+
+	async openAndGetValue(): Promise<string | null> {
+		return new Promise((resolve) => {
+			this.onClose = () => {
+				const { contentEl } = this;
+				contentEl.empty();
+				resolve(this.submitted ? this.result : null);
+			};
+			this.open();
+		});
+	}
+}
 
 interface FolderElements {
 	container: HTMLElement;
@@ -672,10 +735,12 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 
 	private async renameFolderPrompt(folder: TFolder): Promise<void> {
-		const newName = prompt('Enter new folder name:', folder.name);
-		if (newName && newName !== folder.name) {
+		const modal = new TextInputModal(this.app, 'Rename Folder', 'Enter new folder name', folder.name);
+		const newName = await modal.openAndGetValue();
+		
+		if (newName && newName !== folder.name && newName.trim() !== '') {
 			const parentPath = folder.parent?.path || '';
-			const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+			const newPath = parentPath ? `${parentPath}/${newName.trim()}` : newName.trim();
 			
 			try {
 				await this.app.vault.rename(folder, newPath);
@@ -687,18 +752,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 
 	private async deleteFolderPrompt(folder: TFolder): Promise<void> {
-		const folderContents = folder.children.length;
-		const message = folderContents > 0 
-			? `Delete folder "${folder.name}" and all its contents (${folderContents} items)?`
-			: `Delete folder "${folder.name}"?`;
-			
-		if (confirm(message)) {
-			try {
-				await this.app.vault.delete(folder);
-			} catch (error) {
-				console.error('Failed to delete folder:', error);
-				new Notice(`Failed to delete folder: ${error.message}`);
-			}
+		try {
+			await this.app.vault.trash(folder, true);
+		} catch (error) {
+			console.error('Failed to delete folder:', error);
+			new Notice(`Failed to delete folder: ${error.message}`);
 		}
 	}
 }

@@ -1,7 +1,7 @@
 import { App, TFolder, TFile, TAbstractFile, Vault, Menu } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import MyPlugin from './main';
-import { NavigatorView } from './navigator-view';
+import { NavigatorView, TextInputModal } from './navigator-view';
 
 interface FileItemElements {
 	container: HTMLElement;
@@ -1378,9 +1378,12 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private async renameFilePrompt(file: TFile): Promise<void> {
-		const newName = prompt('Enter new file name:', file.basename);
-		if (newName && newName !== file.basename) {
-			const newPath = file.parent ? `${file.parent.path}/${newName}.md` : `${newName}.md`;
+		const modal = new TextInputModal(this.app, 'Rename File', 'Enter new file name', file.basename);
+		const newName = await modal.openAndGetValue();
+		
+		if (newName && newName !== file.basename && newName.trim() !== '') {
+			const extension = file.extension ? `.${file.extension}` : '';
+			const newPath = file.parent ? `${file.parent.path}/${newName.trim()}${extension}` : `${newName.trim()}${extension}`;
 			
 			try {
 				await this.app.vault.rename(file, newPath);
@@ -1395,17 +1398,21 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const folders = this.app.vault.getAllLoadedFiles()
 			.filter(f => f instanceof TFolder) as TFolder[];
 		
-		// Create a simple selection prompt (in a real implementation, you might want a modal)
 		const folderNames = folders.map(f => f.path === '' ? 'Root' : f.path);
-		const selectedFolder = prompt(
-			`Move "${file.basename}" to folder:\n\nAvailable folders:\n${folderNames.join('\n')}\n\nEnter folder path (or "Root" for root folder):`,
-			file.parent?.path || 'Root'
-		);
+		const currentFolder = file.parent?.path || 'Root';
 		
-		if (selectedFolder !== null && selectedFolder !== (file.parent?.path || 'Root')) {
-			const targetPath = selectedFolder === 'Root' || selectedFolder === '' 
+		const modal = new TextInputModal(
+			this.app, 
+			'Move File', 
+			`Move "${file.basename}" to folder.\n\nAvailable folders:\n${folderNames.join(', ')}\n\nEnter folder path:`, 
+			currentFolder
+		);
+		const selectedFolder = await modal.openAndGetValue();
+		
+		if (selectedFolder !== null && selectedFolder !== currentFolder && selectedFolder.trim() !== '') {
+			const targetPath = selectedFolder.trim() === 'Root' || selectedFolder.trim() === '' 
 				? file.name 
-				: `${selectedFolder}/${file.name}`;
+				: `${selectedFolder.trim()}/${file.name}`;
 			
 			try {
 				await this.app.vault.rename(file, targetPath);
@@ -1416,12 +1423,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private async deleteFilePrompt(file: TFile): Promise<void> {
-		if (confirm(`Delete "${file.basename}"?`)) {
-			try {
-				await this.app.vault.delete(file);
-			} catch (error) {
-				console.error('Failed to delete file:', error);
-			}
+		try {
+			await this.app.vault.trash(file, true);
+		} catch (error) {
+			console.error('Failed to delete file:', error);
 		}
 	}
 }
