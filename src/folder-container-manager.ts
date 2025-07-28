@@ -44,9 +44,16 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	openContainer(folder: TFolder): void;
 	openContainer(allNotes: 'ALL_NOTES'): void;
 	openContainer(target: TFolder | 'ALL_NOTES'): void {
-		// Close existing container if any
-		this.closeContainer();
+		// If container already exists, just update it instead of recreating
+		if (this.container) {
+			// Use setTimeout to avoid blocking the UI
+			setTimeout(async () => {
+				await this.updateContainer(target);
+			}, 0);
+			return;
+		}
 
+		// No existing container, create new one
 		if (target === 'ALL_NOTES') {
 			this.isAllNotesMode = true;
 			this.currentFolder = this.app.vault.getRoot(); // Use root for file operations
@@ -719,6 +726,38 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			content.empty();
 			await this.renderFileList(content as HTMLElement);
 		}
+	}
+
+	private updateContainerHeader(): void {
+		if (!this.container || !this.currentFolder) return;
+		
+		const title = this.container.querySelector('.folder-container-title') as HTMLElement;
+		if (!title) return;
+		
+		if (this.isAllNotesMode) {
+			title.textContent = 'All Notes';
+		} else {
+			title.textContent = this.currentFolder.isRoot() ? 'Notes' : this.currentFolder.name;
+		}
+	}
+
+	private async updateContainer(target: TFolder | 'ALL_NOTES'): Promise<void> {
+		if (!this.container) return;
+		
+		// Update folder state
+		if (target === 'ALL_NOTES') {
+			this.isAllNotesMode = true;
+			this.currentFolder = this.app.vault.getRoot(); // Use root for file operations
+		} else {
+			this.isAllNotesMode = false;
+			this.currentFolder = target;
+		}
+		
+		// Update header title
+		this.updateContainerHeader();
+		
+		// Refresh file list content
+		await this.refreshFileList();
 	}
 
 	// Smart update methods for hybrid rendering
