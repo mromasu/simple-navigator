@@ -8,6 +8,7 @@ interface FileItemElements {
 	title: HTMLElement;
 	preview: HTMLElement;
 	meta: HTMLElement;
+	image: HTMLElement;
 	folderBadge?: HTMLElement;
 }
 
@@ -74,6 +75,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			// Clear element tracking
 			this.fileElements.clear();
 			this.groupElements.clear();
+			this.fileImageCache.clear();
 		}
 	}
 
@@ -184,6 +186,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			VaultObserver.getInstance(this.app).unregisterView(this);
 		}
 		this.closeContainer();
+		// Clear image cache
+		this.fileImageCache.clear();
 		// Remove event listeners would go here if we had stored references
 	}
 
@@ -313,7 +317,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private renderFileItem(container: HTMLElement, file: TFile): void {
 		const item = container.createEl('div', { cls: 'file-item' });
 		
-		// Item content
+		// Item content (left side)
 		const itemContent = item.createEl('div', { cls: 'file-item-content' });
 		
 		// File name
@@ -325,7 +329,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		this.setFilePreview(preview, file);
 		
 		// Item metadata
-		const meta = item.createEl('div', { cls: 'file-item-meta' });
+		const meta = itemContent.createEl('div', { cls: 'file-item-meta' });
 		
 		// Folder badge (if not in root)
 		let folderBadge: HTMLElement | undefined;
@@ -334,6 +338,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 		}
 		
+		// Image container (right side)
+		const imageContainer = item.createEl('div', { cls: 'file-item-image' });
+		this.setImagePreview(imageContainer, file);
+		
 		// Store file element references
 		this.fileElements.set(file.path, {
 			container: item,
@@ -341,6 +349,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			title: fileName,
 			preview: preview,
 			meta: meta,
+			image: imageContainer,
 			folderBadge: folderBadge
 		});
 		
@@ -350,15 +359,132 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		});
 	}
 
+	private fileImageCache: Map<string, string | null> = new Map();
+
 	private async setFilePreview(element: HTMLElement, file: TFile): Promise<void> {
 		try {
 			const content = await this.app.vault.read(file);
-			const preview = this.sanitizeContent(content);
 			
+			// Extract first image and cache it
+			const firstImage = this.extractFirstImage(content);
+			this.fileImageCache.set(file.path, firstImage);
+			
+			// Generate text preview
+			const preview = this.sanitizeContent(content);
 			element.textContent = preview || 'No preview available';
 		} catch {
+			this.fileImageCache.set(file.path, null);
 			element.textContent = 'No preview available';
 		}
+	}
+
+	private async setImagePreview(element: HTMLElement, file: TFile): Promise<void> {
+		// Wait for image cache to be populated by setFilePreview
+		setTimeout(async () => {
+			try {
+				const imagePath = this.fileImageCache.get(file.path);
+				
+				if (!imagePath) {
+					// No image found, hide the image container
+					element.style.display = 'none';
+					return;
+				}
+				
+				// Show the image container
+				element.style.display = 'block';
+				
+				// Resolve the image path
+				let resolvedPath: string;
+				
+				if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+					// External URL
+					resolvedPath = imagePath;
+				} else if (imagePath.startsWith('/')) {
+					// Absolute path (probably external)
+					resolvedPath = imagePath;
+				} else {
+					// Relative path or vault file - try multiple resolution strategies
+					let imageFile: TFile | null = null;
+					
+					// Try direct path
+					const directFile = this.app.vault.getAbstractFileByPath(imagePath);
+					if (directFile instanceof TFile) {
+						imageFile = directFile;
+					} else if (file.parent) {
+						// Try relative to the note's folder
+						const relativeFile = this.app.vault.getAbstractFileByPath(`${file.parent.path}/${imagePath}`);
+						if (relativeFile instanceof TFile) {
+							imageFile = relativeFile;
+						}
+					}
+					
+					// If still not found, try finding by filename in the vault
+					if (!imageFile) {
+						const allFiles = this.app.vault.getFiles();
+						imageFile = allFiles.find(f => f.name === imagePath || f.path.endsWith(`/${imagePath}`)) || null;
+					}
+					
+					if (imageFile) {
+						// Use Obsidian's resource URL
+						resolvedPath = this.app.vault.getResourcePath(imageFile);
+					} else {
+						// Fallback - hide the image
+						element.style.display = 'none';
+						return;
+					}
+				}
+				
+				// Create and set up the image element
+				element.empty();
+				const img = element.createEl('img');
+				img.style.width = '100%';
+				img.style.height = '100%';
+				img.style.objectFit = 'cover';
+				img.style.borderRadius = '4px';
+				
+				// Handle image loading
+				img.onload = () => {
+					element.removeClass('loading');
+				};
+				
+				img.onerror = () => {
+					element.style.display = 'none';
+				};
+				
+				// Set loading state
+				element.addClass('loading');
+				img.src = resolvedPath;
+				
+			} catch (error) {
+				console.log('Image preview error:', error);
+				element.style.display = 'none';
+			}
+		}, 10); // Small delay to ensure cache is populated
+	}
+
+	private extractFirstImage(content: string): string | null {
+		// Remove YAML frontmatter first
+		const withoutFrontmatter = content.replace(/^---[\s\S]*?---\n?/m, '');
+		
+		// Pattern for Markdown images: ![alt](path)
+		const markdownImageMatch = withoutFrontmatter.match(/!\[([^\]]*)\]\(([^)]+)\)/);
+		if (markdownImageMatch) {
+			return markdownImageMatch[2]; // Return the path
+		}
+		
+		// Pattern for Obsidian wikilink images: ![[image.png]] or ![[image.png|alt]]
+		const wikiImageMatch = withoutFrontmatter.match(/!\[\[([^|\]]+)(?:\|[^\]]*)?\]\]/);
+		if (wikiImageMatch) {
+			return wikiImageMatch[1]; // Return the filename/path
+		}
+		
+		// Pattern for HTML images: <img src="path">
+		const htmlImageMatch = withoutFrontmatter.match(/<img[^>]+src=["\']([^"\']+)["\'][^>]*>/i);
+		if (htmlImageMatch) {
+			return htmlImageMatch[1]; // Return the src path
+		}
+		
+		return null;
 	}
 
 	private sanitizeContent(content: string): string {
@@ -491,6 +617,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Clear element tracking before full refresh
 		this.fileElements.clear();
 		this.groupElements.clear();
+		this.fileImageCache.clear();
 		
 		const content = this.container.querySelector('.folder-container-content');
 		if (content) {
@@ -514,8 +641,9 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Update title
 		elements.title.textContent = file.basename;
 		
-		// Update preview
+		// Update preview and image
 		await this.setFilePreview(elements.preview, file);
+		await this.setImagePreview(elements.image, file);
 		
 		// Update folder badge
 		if (elements.folderBadge) {
@@ -605,6 +733,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Remove the file item
 		elements.container.remove();
 		this.fileElements.delete(file.path);
+		this.fileImageCache.delete(file.path);
 		
 		// Check if group is now empty and remove if needed
 		const groupName = this.getTargetGroup(file);

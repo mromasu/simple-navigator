@@ -32,7 +32,7 @@ If your plugin does not need CSS, delete this file.
 	flex: 1;
 }
 
-.navigator-create-folder-btn {
+button:not(.clickable-icon).navigator-create-folder-btn {
 	background: none;
 	border: none;
 	font-size: 18px;
@@ -51,7 +51,7 @@ If your plugin does not need CSS, delete this file.
 	flex-shrink: 0;
 }
 
-.navigator-create-folder-btn:hover {
+button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	color: var(--text-muted);
 }
 
@@ -362,6 +362,9 @@ button.folder-container-new-note {
 
 /* File Items */
 .file-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
 	padding: 8px 10px;
 	cursor: pointer;
 	transition: background-color 0.1s ease;
@@ -372,6 +375,8 @@ button.folder-container-new-note {
 }
 
 .file-item-content {
+	flex: 1;
+	min-width: 0;
 	margin-bottom: 2px;
 }
 
@@ -407,6 +412,38 @@ button.folder-container-new-note {
 	padding: 2px 6px;
 	border-radius: 4px;
 	font-size: 11px;
+}
+
+.file-item-image {
+	width: 48px;
+	height: 48px;
+	flex-shrink: 0;
+	border-radius: 4px;
+	overflow: hidden;
+	background-color: var(--background-secondary);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	position: relative;
+}
+
+.file-item-image.loading {
+	background-color: var(--background-modifier-border);
+}
+
+.file-item-image.loading::after {
+	content: '';
+	width: 16px;
+	height: 16px;
+	border: 2px solid var(--background-modifier-border);
+	border-top: 2px solid var(--text-muted);
+	border-radius: 50%;
+	animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
 }
 
 /* Dividers */
