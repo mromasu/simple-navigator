@@ -55,7 +55,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			this.currentFolder = target;
 		}
 		
-		this.createContainer();
+		// Use setTimeout to avoid blocking the UI
+		setTimeout(async () => {
+			await this.createContainer();
+		}, 0);
 		
 		// Register with VaultObserver for file system events
 		VaultObserver.getInstance(this.app).registerView(this);
@@ -79,7 +82,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
-	private createContainer(): void {
+	private async createContainer(): Promise<void> {
 		if (!this.currentFolder) return;
 
 		// Find the workspace element
@@ -118,7 +121,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const content = this.container.createEl('div', { cls: 'folder-container-content' });
 		
 		// Render file list
-		this.renderFileList(content);
+		await this.renderFileList(content);
 
 		// Create resize handle
 		this.resizeHandle = this.container.createEl('div', { cls: 'resize-handle' });
@@ -191,7 +194,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Remove event listeners would go here if we had stored references
 	}
 
-	private renderFileList(content: HTMLElement): void {
+	private async renderFileList(content: HTMLElement): Promise<void> {
 		if (!this.currentFolder) return;
 
 		// Get files based on folder type
@@ -204,7 +207,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		for (const [groupName, groupFiles] of Object.entries(groupedFiles)) {
 			if (groupFiles.length === 0) continue;
 			
-			this.renderFileGroup(content, groupName, groupFiles);
+			await this.renderFileGroup(content, groupName, groupFiles);
 		}
 	}
 
@@ -286,7 +289,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
-	private renderFileGroup(content: HTMLElement, groupName: string, files: TFile[]): void {
+	private async renderFileGroup(content: HTMLElement, groupName: string, files: TFile[]): Promise<void> {
 		const group = content.createEl('div', { cls: 'file-list-group' });
 		
 		// Group header
@@ -305,7 +308,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		// File items
 		for (let i = 0; i < files.length; i++) {
-			this.renderFileItem(container, files[i]);
+			await this.renderFileItem(container, files[i]);
 			
 			// Add divider after each item except the last
 			if (i < files.length - 1) {
@@ -314,7 +317,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
-	private renderFileItem(container: HTMLElement, file: TFile): void {
+	private async renderFileItem(container: HTMLElement, file: TFile): Promise<void> {
 		const item = container.createEl('div', { cls: 'file-item' });
 		
 		// Item content (left side)
@@ -326,7 +329,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		// File preview
 		const preview = itemContent.createEl('div', { cls: 'file-item-preview' });
-		this.setFilePreview(preview, file);
 		
 		// Item metadata (only show if NOT in All Notes mode)
 		let meta: HTMLElement | undefined;
@@ -343,7 +345,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		// Image container (right side)
 		const imageContainer = item.createEl('div', { cls: 'file-item-image' });
-		this.setImagePreview(imageContainer, file);
 		
 		// Add folder attribute to container
 		let folderName: string;
@@ -371,9 +372,43 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		item.addEventListener('click', () => {
 			this.app.workspace.openLinkText(file.path, '', false);
 		});
+		
+		// Load content and image with proper coordination
+		await this.loadFileContent(file, preview, imageContainer);
 	}
 
 	private fileImageCache: Map<string, string | null> = new Map();
+
+	// New unified method to load both preview and image with proper coordination
+	private async loadFileContent(file: TFile, previewElement: HTMLElement, imageElement: HTMLElement): Promise<void> {
+		try {
+			const content = await this.app.vault.read(file);
+			
+			// Extract first image and cache it
+			const firstImage = this.extractFirstImage(content);
+			this.fileImageCache.set(file.path, firstImage);
+			
+			// Set text preview
+			const preview = this.sanitizeContent(content);
+			previewElement.textContent = preview || 'No preview available';
+			
+			// Load image with retry logic if image path found
+			if (firstImage) {
+				// Clear any existing CSS classes
+				imageElement.removeClass('loading', 'error', 'retry');
+				await this.setImagePreviewWithRetry(imageElement, file, firstImage);
+			} else {
+				// No image found, clean up and hide the image container
+				imageElement.removeClass('loading', 'error', 'retry');
+				imageElement.style.display = 'none';
+			}
+		} catch (error) {
+			console.log('File content loading error:', error);
+			this.fileImageCache.set(file.path, null);
+			previewElement.textContent = 'No preview available';
+			imageElement.style.display = 'none';
+		}
+	}
 
 	private async setFilePreview(element: HTMLElement, file: TFile): Promise<void> {
 		try {
@@ -392,88 +427,133 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
-	private async setImagePreview(element: HTMLElement, file: TFile): Promise<void> {
-		// Wait for image cache to be populated by setFilePreview
-		setTimeout(async () => {
-			try {
-				const imagePath = this.fileImageCache.get(file.path);
+	// Image preview with retry logic and exponential backoff
+	private async setImagePreviewWithRetry(element: HTMLElement, file: TFile, imagePath: string, attempt: number = 1): Promise<void> {
+		const MAX_RETRIES = 3;
+		const BASE_DELAY = 100; // Start with 100ms delay
+		
+		try {
+			// Show the image container and set loading state
+			element.style.display = 'block';
+			element.addClass('loading');
+			
+			// Resolve the image path
+			let resolvedPath: string;
+			
+			if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+				// External URL
+				resolvedPath = imagePath;
+			} else if (imagePath.startsWith('/')) {
+				// Absolute path (probably external)
+				resolvedPath = imagePath;
+			} else {
+				// Relative path or vault file - try multiple resolution strategies
+				let imageFile: TFile | null = null;
 				
-				if (!imagePath) {
-					// No image found, hide the image container
+				// Try direct path
+				const directFile = this.app.vault.getAbstractFileByPath(imagePath);
+				if (directFile instanceof TFile) {
+					imageFile = directFile;
+				} else if (file.parent) {
+					// Try relative to the note's folder
+					const relativeFile = this.app.vault.getAbstractFileByPath(`${file.parent.path}/${imagePath}`);
+					if (relativeFile instanceof TFile) {
+						imageFile = relativeFile;
+					}
+				}
+				
+				// If still not found, try finding by filename in the vault
+				if (!imageFile) {
+					const allFiles = this.app.vault.getFiles();
+					imageFile = allFiles.find(f => f.name === imagePath || f.path.endsWith(`/${imagePath}`)) || null;
+				}
+				
+				if (imageFile) {
+					// Use Obsidian's resource URL with error checking
+					try {
+						resolvedPath = this.app.vault.getResourcePath(imageFile);
+						if (!resolvedPath) {
+							throw new Error('Resource path returned null');
+						}
+					} catch (resourceError) {
+						console.log(`Image resource path error (attempt ${attempt}):`, resourceError);
+						throw resourceError;
+					}
+				} else {
+					// No image file found
 					element.style.display = 'none';
+					element.removeClass('loading');
 					return;
 				}
-				
-				// Show the image container
-				element.style.display = 'block';
-				
-				// Resolve the image path
-				let resolvedPath: string;
-				
-				if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-					// External URL
-					resolvedPath = imagePath;
-				} else if (imagePath.startsWith('/')) {
-					// Absolute path (probably external)
-					resolvedPath = imagePath;
-				} else {
-					// Relative path or vault file - try multiple resolution strategies
-					let imageFile: TFile | null = null;
-					
-					// Try direct path
-					const directFile = this.app.vault.getAbstractFileByPath(imagePath);
-					if (directFile instanceof TFile) {
-						imageFile = directFile;
-					} else if (file.parent) {
-						// Try relative to the note's folder
-						const relativeFile = this.app.vault.getAbstractFileByPath(`${file.parent.path}/${imagePath}`);
-						if (relativeFile instanceof TFile) {
-							imageFile = relativeFile;
-						}
-					}
-					
-					// If still not found, try finding by filename in the vault
-					if (!imageFile) {
-						const allFiles = this.app.vault.getFiles();
-						imageFile = allFiles.find(f => f.name === imagePath || f.path.endsWith(`/${imagePath}`)) || null;
-					}
-					
-					if (imageFile) {
-						// Use Obsidian's resource URL
-						resolvedPath = this.app.vault.getResourcePath(imageFile);
-					} else {
-						// Fallback - hide the image
-						element.style.display = 'none';
-						return;
-					}
-				}
-				
-				// Create and set up the image element
-				element.empty();
-				const img = element.createEl('img');
-				img.style.width = '100%';
-				img.style.height = '100%';
-				img.style.objectFit = 'cover';
-				img.style.borderRadius = '4px';
-				
-				// Handle image loading
-				img.onload = () => {
-					element.removeClass('loading');
-				};
-				
-				img.onerror = () => {
-					element.style.display = 'none';
-				};
-				
-				// Set loading state
-				element.addClass('loading');
-				img.src = resolvedPath;
-				
-			} catch (error) {
-				console.log('Image preview error:', error);
-				element.style.display = 'none';
 			}
-		}, 10); // Small delay to ensure cache is populated
+			
+			// Create and set up the image element
+			element.empty();
+			const img = element.createEl('img');
+			img.style.width = '100%';
+			img.style.height = '100%';
+			img.style.objectFit = 'cover';
+			img.style.borderRadius = '4px';
+			
+			// Promise-based image loading with timeout
+			await new Promise<void>((resolve, reject) => {
+				const timeout = setTimeout(() => {
+					reject(new Error('Image load timeout'));
+				}, 5000); // 5 second timeout
+				
+				img.onload = () => {
+					clearTimeout(timeout);
+					element.removeClass('loading');
+					resolve();
+				};
+				
+				img.onerror = (error) => {
+					clearTimeout(timeout);
+					reject(new Error(`Image load failed: ${error}`));
+				};
+				
+				img.src = resolvedPath;
+			});
+			
+		} catch (error) {
+			console.log(`Image preview error (attempt ${attempt}/${MAX_RETRIES}):`, error);
+			element.removeClass('loading');
+			
+			// Retry with exponential backoff if we haven't exceeded max retries
+			if (attempt < MAX_RETRIES) {
+				const delay = BASE_DELAY * Math.pow(2, attempt - 1); // 100ms, 200ms, 400ms
+				console.log(`Retrying image load in ${delay}ms...`);
+				
+				// Show retry state
+				element.addClass('retry');
+				
+				setTimeout(() => {
+					element.removeClass('retry');
+					this.setImagePreviewWithRetry(element, file, imagePath, attempt + 1);
+				}, delay);
+			} else {
+				// Max retries exceeded, show error state briefly then hide
+				console.log('Max retries exceeded, showing error state');
+				element.addClass('error');
+				
+				setTimeout(() => {
+					element.removeClass('error');
+					element.style.display = 'none';
+				}, 2000); // Show error for 2 seconds
+			}
+		}
+	}
+
+	private async setImagePreview(element: HTMLElement, file: TFile): Promise<void> {
+		const imagePath = this.fileImageCache.get(file.path);
+		
+		if (!imagePath) {
+			// No image found, hide the image container
+			element.style.display = 'none';
+			return;
+		}
+		
+		await this.setImagePreviewWithRetry(element, file, imagePath);
 	}
 
 	private extractFirstImage(content: string): string | null {
@@ -626,7 +706,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
-	private refreshFileList(): void {
+	private async refreshFileList(): Promise<void> {
 		if (!this.container || !this.currentFolder) return;
 		
 		// Clear element tracking before full refresh
@@ -637,7 +717,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const content = this.container.querySelector('.folder-container-content');
 		if (content) {
 			content.empty();
-			this.renderFileList(content as HTMLElement);
+			await this.renderFileList(content as HTMLElement);
 		}
 	}
 
@@ -656,9 +736,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Update title
 		elements.title.textContent = file.basename;
 		
-		// Update preview and image
-		await this.setFilePreview(elements.preview, file);
-		await this.setImagePreview(elements.image, file);
+		// Update preview and image using coordinated loading
+		await this.loadFileContent(file, elements.preview, elements.image);
 		
 		// Update folder badge (only if NOT in All Notes mode)
 		if (elements.folderBadge) {
@@ -686,7 +765,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		console.log('[RENAME DEBUG] updateFileItem END');
 	}
 
-	private addFileItem(file: TFile, groupName: string): void {
+	private async addFileItem(file: TFile, groupName: string): Promise<void> {
 		const groupElements = this.groupElements.get(groupName);
 		if (!groupElements) {
 			// Group doesn't exist, create it
@@ -704,7 +783,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		// Create temporary container to render the file item
 		const tempContainer = document.createElement('div');
-		this.renderFileItem(tempContainer, file);
+		await this.renderFileItem(tempContainer, file);
 		const newItem = tempContainer.firstChild as HTMLElement;
 		
 		// Insert at correct position
@@ -768,7 +847,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		console.log('[RENAME DEBUG] removeFileItem END');
 	}
 
-	private moveFileItem(file: TFile, oldGroupName: string, newGroupName: string): void {
+	private async moveFileItem(file: TFile, oldGroupName: string, newGroupName: string): Promise<void> {
 		console.log('[RENAME DEBUG] moveFileItem START', {
 			filePath: file.path,
 			oldGroupName,
@@ -776,7 +855,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		});
 		
 		this.removeFileItem(file);
-		this.addFileItem(file, newGroupName);
+		await this.addFileItem(file, newGroupName);
 		
 		console.log('[RENAME DEBUG] moveFileItem END');
 	}
@@ -901,7 +980,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		if (file instanceof TFile) {
 			const groupName = this.getTargetGroup(file);
-			this.addFileItem(file, groupName);
+			// Use setTimeout to avoid blocking
+			setTimeout(async () => {
+				await this.addFileItem(file, groupName);
+			}, 0);
 		}
 	}
 
@@ -967,11 +1049,15 @@ export class FolderContainerManager implements VaultUpdateHandler {
 				if (oldGroupName === newGroupName) {
 					console.log('[RENAME DEBUG] Same group - updating file item');
 					// Same group, just update the file item
-					this.updateFileItem(file);
+					setTimeout(async () => {
+						await this.updateFileItem(file);
+					}, 0);
 				} else {
 					console.log('[RENAME DEBUG] Different group - moving file item');
 					// Different group, move the file
-					this.moveFileItem(file, oldGroupName, newGroupName);
+					setTimeout(async () => {
+						await this.moveFileItem(file, oldGroupName, newGroupName);
+					}, 0);
 				}
 			} else if (wasInFolder && !isInFolder) {
 				console.log('[RENAME DEBUG] File moved out of current folder');
@@ -981,7 +1067,9 @@ export class FolderContainerManager implements VaultUpdateHandler {
 				console.log('[RENAME DEBUG] File moved into current folder');
 				// File was moved into current folder
 				const groupName = this.getTargetGroup(file);
-				this.addFileItem(file, groupName);
+				setTimeout(async () => {
+					await this.addFileItem(file, groupName);
+				}, 0);
 			} else {
 				console.log('[RENAME DEBUG] File rename not relevant to current folder');
 			}
@@ -1005,10 +1093,14 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			
 			if (currentGroupName === targetGroupName) {
 				// Same group, just update the file item (preview content, etc.)
-				this.updateFileItem(file);
+				setTimeout(async () => {
+					await this.updateFileItem(file);
+				}, 0);
 			} else {
 				// Different group due to modification time change
-				this.moveFileItem(file, currentGroupName, targetGroupName);
+				setTimeout(async () => {
+					await this.moveFileItem(file, currentGroupName, targetGroupName);
+				}, 0);
 			}
 		}
 	}

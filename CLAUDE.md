@@ -46,5 +46,5 @@ The plugin follows standard Obsidian plugin patterns:
 
 ## ALWAYS KEEP IN MIND
 
-- Commit progress as last task in todo list
+- Commit progress as last task in todo list. ALWAYS!
 - Use "https://docs.obsidian.md" to get docs for obsidian API and CSS styling variables.
