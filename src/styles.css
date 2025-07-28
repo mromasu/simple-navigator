@@ -414,10 +414,6 @@ button.folder-container-new-note {
 	font-size: 11px;
 }
 
-/* Hide meta section for All Notes folder */
-[folder="All Notes"] .file-item-meta {
-	display: none;
-}
 
 .file-item-image {
 	width: 48px;

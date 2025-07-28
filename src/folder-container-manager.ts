@@ -349,10 +349,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// File preview
 		const preview = itemContent.createEl('div', { cls: 'file-item-preview' });
 		
-		// Item metadata (only show if NOT in All Notes mode)
+		// Item metadata (only show if in All Notes mode)
 		let meta: HTMLElement | undefined;
 		let folderBadge: HTMLElement | undefined;
-		if (!this.isAllNotesMode) {
+		if (this.isAllNotesMode) {
 			meta = itemContent.createEl('div', { cls: 'file-item-meta' });
 			
 			// Folder badge (if not in root)
