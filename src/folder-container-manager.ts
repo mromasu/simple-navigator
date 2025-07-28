@@ -7,7 +7,7 @@ interface FileItemElements {
 	content: HTMLElement;
 	title: HTMLElement;
 	preview: HTMLElement;
-	meta: HTMLElement;
+	meta?: HTMLElement;
 	image: HTMLElement;
 	folderBadge?: HTMLElement;
 }
@@ -328,19 +328,33 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const preview = itemContent.createEl('div', { cls: 'file-item-preview' });
 		this.setFilePreview(preview, file);
 		
-		// Item metadata
-		const meta = itemContent.createEl('div', { cls: 'file-item-meta' });
-		
-		// Folder badge (if not in root)
+		// Item metadata (only show if NOT in All Notes mode)
+		let meta: HTMLElement | undefined;
 		let folderBadge: HTMLElement | undefined;
-		if (!file.parent?.isRoot()) {
-			folderBadge = meta.createEl('span', { cls: 'file-item-folder' });
-			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
+		if (!this.isAllNotesMode) {
+			meta = itemContent.createEl('div', { cls: 'file-item-meta' });
+			
+			// Folder badge (if not in root)
+			if (!file.parent?.isRoot()) {
+				folderBadge = meta.createEl('span', { cls: 'file-item-folder' });
+				folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
+			}
 		}
 		
 		// Image container (right side)
 		const imageContainer = item.createEl('div', { cls: 'file-item-image' });
 		this.setImagePreview(imageContainer, file);
+		
+		// Add folder attribute to container
+		let folderName: string;
+		if (this.isAllNotesMode) {
+			folderName = 'All Notes';
+		} else if (this.currentFolder?.isRoot()) {
+			folderName = 'Notes';
+		} else {
+			folderName = this.currentFolder?.name || 'Notes';
+		}
+		item.setAttribute('folder', folderName);
 		
 		// Store file element references
 		this.fileElements.set(file.path, {
@@ -504,9 +518,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		sanitized = sanitized.replace(/`[^`]*`/g, '');
 
 		// Remove links and references
-		sanitized = sanitized.replace(/\[\[.*?\]\]/g, ''); // Wiki links
-		sanitized = sanitized.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'); // Markdown links
-		sanitized = sanitized.replace(/!\[([^\]]*)\]\([^)]*\)/g, ''); // Images
+		sanitized = sanitized.replace(/!\[\[.*?\]\]/g, ''); // Wiki image links (with !)
+		sanitized = sanitized.replace(/\[\[.*?\]\]/g, ''); // Wiki links (no !)
+		sanitized = sanitized.replace(/!\[([^\]]*)\]\([^)]*\)/g, ''); // Markdown images (with !)
+		sanitized = sanitized.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'); // Markdown links (no !)
 
 		// Remove emphasis and formatting
 		sanitized = sanitized.replace(/\*\*([^*]*)\*\*/g, '$1'); // Bold
@@ -645,17 +660,28 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		await this.setFilePreview(elements.preview, file);
 		await this.setImagePreview(elements.image, file);
 		
-		// Update folder badge
+		// Update folder badge (only if NOT in All Notes mode)
 		if (elements.folderBadge) {
 			elements.folderBadge.remove();
 			elements.folderBadge = undefined;
 		}
 		
-		if (!file.parent?.isRoot()) {
+		if (!this.isAllNotesMode && elements.meta && !file.parent?.isRoot()) {
 			const folderBadge = elements.meta.createEl('span', { cls: 'file-item-folder' });
 			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 			elements.folderBadge = folderBadge;
 		}
+		
+		// Update folder attribute
+		let folderName: string;
+		if (this.isAllNotesMode) {
+			folderName = 'All Notes';
+		} else if (this.currentFolder?.isRoot()) {
+			folderName = 'Notes';
+		} else {
+			folderName = this.currentFolder?.name || 'Notes';
+		}
+		elements.container.setAttribute('folder', folderName);
 		
 		console.log('[RENAME DEBUG] updateFileItem END');
 	}
