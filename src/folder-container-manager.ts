@@ -1239,6 +1239,41 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		console.log('[RENAME DEBUG] Updated fileElements keys:', Array.from(this.fileElements.keys()));
 	}
 
+	private getNextUntitledNumber(targetFolder: TFolder): number {
+		const files = targetFolder.children.filter(child => child instanceof TFile) as TFile[];
+		const untitledPattern = /^Untitled( (\d+))?\.md$/;
+		const existingNumbers: number[] = [];
+
+		for (const file of files) {
+			const match = file.name.match(untitledPattern);
+			if (match) {
+				if (match[2]) {
+					// File has a number (e.g., "Untitled 2.md")
+					existingNumbers.push(parseInt(match[2], 10));
+				} else {
+					// File is just "Untitled.md" (treat as number 0)
+					existingNumbers.push(0);
+				}
+			}
+		}
+
+		// Find the next available number
+		if (existingNumbers.length === 0) {
+			return 0; // Start with "Untitled.md"
+		}
+
+		existingNumbers.sort((a, b) => a - b);
+		
+		// Find the first gap or return the next number after the highest
+		for (let i = 0; i < existingNumbers.length; i++) {
+			if (existingNumbers[i] !== i) {
+				return i;
+			}
+		}
+		
+		return existingNumbers.length;
+	}
+
 	private async createNewNote(): Promise<void> {
 		if (!this.currentFolder) return;
 		
@@ -1254,9 +1289,9 @@ export class FolderContainerManager implements VaultUpdateHandler {
 				targetFolder = this.currentFolder;
 			}
 			
-			// Generate a unique file name
-			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-			const fileName = `Untitled ${timestamp}.md`;
+			// Generate a unique file name with incremental numbering
+			const nextNumber = this.getNextUntitledNumber(targetFolder);
+			const fileName = nextNumber === 0 ? 'Untitled.md' : `Untitled ${nextNumber}.md`;
 			const filePath = targetFolder.path ? `${targetFolder.path}/${fileName}` : fileName;
 			
 			// Create the new file
