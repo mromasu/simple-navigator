@@ -1,6 +1,7 @@
 import { App, TFolder, TFile, TAbstractFile, Vault } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import MyPlugin from './main';
+import { NavigatorView } from './navigator-view';
 
 interface FileItemElements {
 	container: HTMLElement;
@@ -21,6 +22,7 @@ interface GroupElements {
 export class FolderContainerManager implements VaultUpdateHandler {
 	private app: App;
 	private plugin: MyPlugin;
+	private navigatorView: NavigatorView;
 	private container: HTMLElement | null = null;
 	private currentFolder: TFolder | null = null;
 	private resizeHandle: HTMLElement | null = null;
@@ -31,9 +33,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private groupElements: Map<string, GroupElements> = new Map();
 	private isAllNotesMode: boolean = false;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: MyPlugin, navigatorView: NavigatorView) {
 		this.app = app;
 		this.plugin = plugin;
+		this.navigatorView = navigatorView;
 		this.bindEvents();
 	}
 
@@ -57,9 +60,13 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		if (target === 'ALL_NOTES') {
 			this.isAllNotesMode = true;
 			this.currentFolder = this.app.vault.getRoot(); // Use root for file operations
+			// Set active folder in navigator
+			this.navigatorView.setActiveFolder('ALL_NOTES');
 		} else {
 			this.isAllNotesMode = false;
 			this.currentFolder = target;
+			// Set active folder in navigator
+			this.navigatorView.setActiveFolder(target.path);
 		}
 		
 		// Use setTimeout to avoid blocking the UI
@@ -75,6 +82,9 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		if (this.container) {
 			// Unregister from VaultObserver
 			VaultObserver.getInstance(this.app).unregisterView(this);
+			
+			// Clear active folder in navigator
+			this.navigatorView.clearActiveFolder();
 			
 			this.container.remove();
 			this.container = null;
@@ -195,6 +205,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		if (this.container) {
 			VaultObserver.getInstance(this.app).unregisterView(this);
 		}
+		// Clear active folder in navigator
+		this.navigatorView.clearActiveFolder();
 		this.closeContainer();
 		// Clear image cache
 		this.fileImageCache.clear();
@@ -748,9 +760,13 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		if (target === 'ALL_NOTES') {
 			this.isAllNotesMode = true;
 			this.currentFolder = this.app.vault.getRoot(); // Use root for file operations
+			// Update active folder in navigator
+			this.navigatorView.setActiveFolder('ALL_NOTES');
 		} else {
 			this.isAllNotesMode = false;
 			this.currentFolder = target;
+			// Update active folder in navigator
+			this.navigatorView.setActiveFolder(target.path);
 		}
 		
 		// Update header title
@@ -1249,8 +1265,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			// Open the new file in the main editor
 			await this.app.workspace.openLinkText(newFile.path, '', false);
 			
-			// Close the container to give focus to the editor
-			this.closeContainer();
+			// Don't close the container - keep it open for quick access
 			
 		} catch (error) {
 			console.error('Failed to create new note:', error);

@@ -19,10 +19,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	private folderCounts: Map<string, number> = new Map();
 	private folderElements: Map<string, FolderElements> = new Map();
 	private containerManager: FolderContainerManager;
+	private activeFolder: string | null = null;
 
 	constructor(leaf: WorkspaceLeaf, private plugin: MyPlugin) {
 		super(leaf);
-		this.containerManager = new FolderContainerManager(this.app, plugin);
+		this.containerManager = new FolderContainerManager(this.app, plugin, this);
 	}
 
 	getViewType(): string {
@@ -61,6 +62,8 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 
 	async onClose(): Promise<void> {
+		// Clear active folder state
+		this.clearActiveFolder();
 		// Unregister from VaultObserver
 		VaultObserver.getInstance(this.app).unregisterView(this);
 		// Clean up container manager
@@ -426,12 +429,21 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 
 	private refreshView(): void {
+		// Store current active folder to restore after refresh
+		const currentActiveFolder = this.activeFolder;
+		
 		// Clear element tracking and do full refresh as fallback
 		this.folderElements.clear();
 		const container = this.containerEl.querySelector('.folder-tree');
 		if (container) {
 			container.empty();
 			this.renderFolderTree(container as HTMLElement);
+			
+			// Restore active folder state after refresh
+			if (currentActiveFolder) {
+				this.activeFolder = currentActiveFolder;
+				this.highlightActiveFolder(currentActiveFolder);
+			}
 		}
 	}
 
@@ -459,6 +471,55 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			});
 			modal.open();
 		});
+	}
+
+	// Active folder management methods
+	setActiveFolder(folderPath: string): void {
+		// Clear previous active folder
+		this.clearActiveFolder();
+		
+		// Set new active folder
+		this.activeFolder = folderPath;
+		
+		// Apply active styling
+		this.highlightActiveFolder(folderPath);
+	}
+
+	clearActiveFolder(): void {
+		if (this.activeFolder) {
+			this.removeActiveFolderHighlight(this.activeFolder);
+			this.activeFolder = null;
+		}
+	}
+
+	private highlightActiveFolder(folderPath: string): void {
+		const folderElement = this.folderElements.get(folderPath);
+		if (folderElement) {
+			folderElement.container.addClass('folder-active');
+		}
+		
+		// Handle special case for "All Notes"
+		if (folderPath === 'ALL_NOTES') {
+			const allNotesEl = this.containerEl.querySelector('.all-notes-header');
+			if (allNotesEl) {
+				allNotesEl.addClass('folder-active');
+			}
+		}
+	}
+
+	private removeActiveFolderHighlight(folderPath: string): void {
+		const folderElement = this.folderElements.get(folderPath);
+		if (folderElement) {
+			folderElement.container.removeClass('folder-active');
+		}
+		
+		// Handle special case for "All Notes"
+		if (folderPath === 'ALL_NOTES') {
+			const allNotesEl = this.containerEl.querySelector('.all-notes-header');
+			if (allNotesEl) {
+				allNotesEl.removeClass('folder-active');
+			}
+		}
 	}
 }
 
