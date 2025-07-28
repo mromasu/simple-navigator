@@ -16,13 +16,43 @@ If your plugin does not need CSS, delete this file.
 }
 
 .navigator-title {
-	text-align: center;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 	font-size: 16px;
 	font-weight: 500;
 	color: var(--text-normal);
 	margin-bottom: 16px;
 	border-bottom: 1px solid var(--background-modifier-border);
 	padding-bottom: 8px;
+}
+
+.navigator-title-text {
+	text-align: left;
+	flex: 1;
+}
+
+.navigator-create-folder-btn {
+	background: none;
+	border: none;
+	font-size: 18px;
+	font-weight: bold;
+	color: var(--interactive-accent);
+	cursor: pointer;
+	padding: 4px 8px;
+	border-radius: 4px;
+	transition: color 0.1s ease;
+	box-shadow: none;
+	width: 24px;
+	height: 24px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.navigator-create-folder-btn:hover {
+	color: var(--text-muted);
 }
 
 .folder-tree {

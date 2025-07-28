@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault, Modal, App, Notice } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import { FolderContainerManager } from './folder-container-manager';
 import MyPlugin from './main';
@@ -43,7 +43,15 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		container.addClass('navigator-view');
 		
 		const title = container.createEl('div', { cls: 'navigator-title' });
-		title.textContent = 'Folders';
+		
+		const titleText = title.createEl('span', { cls: 'navigator-title-text' });
+		titleText.textContent = 'Folders';
+		
+		const createFolderBtn = title.createEl('button', { cls: 'navigator-create-folder-btn' });
+		createFolderBtn.textContent = '+';
+		createFolderBtn.addEventListener('click', () => {
+			this.createNewFolder();
+		});
 		
 		const treeContainer = container.createEl('div', { cls: 'folder-tree' });
 		this.renderFolderTree(treeContainer);
@@ -172,9 +180,10 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			this.containerManager.openContainer('ALL_NOTES');
 		});
 		
-		// All Notes icon (using a special icon)
+		// All Notes icon (using folder icon like other folders)
 		const folderIconContainer = header.createEl('span', { cls: 'folder-icon' });
-		const folderIcon = this.createLucideIcon('M4 4h16v2H4V4zm0 4h16v2H4V8zm0 4h16v2H4v-2zm0 4h10v2H4v-2z', 'all-notes-icon');
+		const folderIcon = this.getFolderIcon(false, false);
+		folderIcon.addClass('all-notes-icon');
 		folderIconContainer.appendChild(folderIcon);
 		
 		// All Notes name
@@ -424,5 +433,121 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			container.empty();
 			this.renderFolderTree(container as HTMLElement);
 		}
+	}
+
+	private async createNewFolder(): Promise<void> {
+		const folderName = await this.promptForFolderName();
+		if (!folderName) return;
+
+		// Create folder in root directory
+		const folderPath = folderName;
+		
+		try {
+			await this.app.vault.createFolder(folderPath);
+			// The VaultObserver will handle updating the UI automatically
+		} catch (error) {
+			console.error('Failed to create folder:', error);
+			// Show error to user if folder creation fails
+			new Notice(`Failed to create folder: ${error.message}`);
+		}
+	}
+
+	private async promptForFolderName(): Promise<string | null> {
+		return new Promise((resolve) => {
+			const modal = new FolderNameModal(this.app, (result) => {
+				resolve(result);
+			});
+			modal.open();
+		});
+	}
+}
+
+class FolderNameModal extends Modal {
+	private result: string | null = null;
+	private onSubmit: (result: string | null) => void;
+
+	constructor(app: App, onSubmit: (result: string | null) => void) {
+		super(app);
+		this.onSubmit = onSubmit;
+	}
+
+	onOpen() {
+		const { contentEl } = this;
+		contentEl.createEl('h2', { text: 'Create New Folder' });
+
+		const inputContainer = contentEl.createDiv();
+		const input = inputContainer.createEl('input', {
+			type: 'text',
+			placeholder: 'Folder name...'
+		});
+		input.style.width = '100%';
+		input.style.padding = '8px';
+		input.style.marginBottom = '16px';
+		input.style.border = '1px solid var(--background-modifier-border)';
+		input.style.borderRadius = '4px';
+		input.style.backgroundColor = 'var(--background-primary)';
+		input.style.color = 'var(--text-normal)';
+
+		const buttonContainer = contentEl.createDiv();
+		buttonContainer.style.display = 'flex';
+		buttonContainer.style.gap = '8px';
+		buttonContainer.style.justifyContent = 'flex-end';
+
+		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
+		cancelBtn.style.padding = '8px 16px';
+		cancelBtn.style.border = '1px solid var(--background-modifier-border)';
+		cancelBtn.style.borderRadius = '4px';
+		cancelBtn.style.backgroundColor = 'var(--background-secondary)';
+		cancelBtn.style.color = 'var(--text-normal)';
+		cancelBtn.style.cursor = 'pointer';
+
+		const createBtn = buttonContainer.createEl('button', { text: 'Create' });
+		createBtn.style.padding = '8px 16px';
+		createBtn.style.border = 'none';
+		createBtn.style.borderRadius = '4px';
+		createBtn.style.backgroundColor = 'var(--interactive-accent)';
+		createBtn.style.color = 'var(--text-on-accent)';
+		createBtn.style.cursor = 'pointer';
+
+		// Event handlers
+		input.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter') {
+				this.submit();
+			} else if (e.key === 'Escape') {
+				this.close();
+			}
+		});
+
+		cancelBtn.addEventListener('click', () => {
+			this.close();
+		});
+
+		createBtn.addEventListener('click', () => {
+			this.submit();
+		});
+
+		// Focus input
+		input.focus();
+	}
+
+	private submit() {
+		const input = this.contentEl.querySelector('input') as HTMLInputElement;
+		const value = input.value.trim();
+		
+		if (value) {
+			// Basic validation
+			if (value.includes('/') || value.includes('\\')) {
+				new Notice('Folder name cannot contain slashes');
+				return;
+			}
+			
+			this.result = value;
+		}
+		
+		this.close();
+	}
+
+	onClose() {
+		this.onSubmit(this.result);
 	}
 }
