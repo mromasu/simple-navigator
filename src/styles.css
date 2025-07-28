@@ -163,34 +163,65 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-modifier-hover);
 }
 
-/* All Notes styling */
+/* All Notes styling - default subtle appearance */
 .folder-item.all-notes-header {
 	margin-bottom: 8px;
 }
 
 .folder-item.all-notes-header .folder-header {
 	font-weight: 600;
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
+	background-color: var(--background-secondary);
 	border-radius: 6px;
 	transition: background-color 0.1s ease;
 }
 
 .folder-item.all-notes-header .folder-header:hover {
-	background-color: var(--interactive-accent-hover);
+	background-color: var(--background-modifier-hover);
 }
 
 .all-notes-icon {
-	color: var(--text-on-accent);
+	color: var(--text-normal);
 }
 
 .all-notes-name {
-	color: var(--text-on-accent);
+	color: var(--text-normal);
 }
 
 .all-notes-count {
-	color: var(--text-on-accent);
+	color: var(--text-muted);
 	font-weight: 600;
+}
+
+/* All Notes active state - only when actually selected */
+.folder-item.all-notes-header.folder-active .folder-header {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.folder-item.all-notes-header.folder-active .folder-header:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.folder-item.all-notes-header.folder-active .all-notes-icon,
+.folder-item.all-notes-header.folder-active .all-notes-name,
+.folder-item.all-notes-header.folder-active .all-notes-count {
+	color: var(--text-on-accent);
+}
+
+/* Active folder state - when container is open */
+.folder-item.folder-active .folder-header {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.folder-item.folder-active .folder-name,
+.folder-item.folder-active .folder-count,
+.folder-item.folder-active .folder-chevron {
+	color: var(--text-on-accent) !important;
+}
+
+.folder-item.folder-active .folder-icon svg {
+	color: var(--text-on-accent);
 }
 
 /* Folder container styles */
