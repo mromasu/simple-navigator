@@ -17,6 +17,7 @@ interface FolderElements {
 export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	private expandedFolders: Set<string> = new Set();
 	private folderCounts: Map<string, number> = new Map();
+	private rootOnlyCount: number = 0;
 	private folderElements: Map<string, FolderElements> = new Map();
 	private containerManager: FolderContainerManager;
 	private activeFolder: string | null = null;
@@ -152,8 +153,8 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		const folderName = rootHeader.createEl('span', { cls: 'folder-name' });
 		folderName.textContent = 'Notes';
 		
-		// Root folder note count
-		const noteCount = this.folderCounts.get(rootFolder.path) || 0;
+		// Root folder note count (root files only, no subfolders)
+		const noteCount = this.rootOnlyCount;
 		const countEl = rootHeader.createEl('span', { cls: 'folder-count' });
 		countEl.textContent = noteCount.toString();
 		
@@ -303,6 +304,20 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		};
 		
 		processFolder(this.app.vault.getRoot());
+		this.calculateRootOnlyCount();
+	}
+
+	private calculateRootOnlyCount(): void {
+		const rootFolder = this.app.vault.getRoot();
+		let count = 0;
+		
+		for (const child of rootFolder.children) {
+			if (child instanceof TFile) {
+				count++;
+			}
+		}
+		
+		this.rootOnlyCount = count;
 	}
 
 	private getTotalFileCount(): number {
