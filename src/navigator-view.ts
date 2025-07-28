@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault, Modal, App, Notice } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault, Notice } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import { FolderContainerManager } from './folder-container-manager';
 import MyPlugin from './main';
@@ -388,6 +388,14 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		}
 	}
 
+	private updateAllNotesCount(): void {
+		const totalCount = this.getTotalFileCount();
+		const allNotesCountEl = this.containerEl.querySelector('.all-notes-count');
+		if (allNotesCountEl) {
+			allNotesCountEl.textContent = totalCount.toString();
+		}
+	}
+
 	// VaultUpdateHandler interface implementation
 	handleFileCreate(file: TAbstractFile, affectedFolders: string[]): void {
 		if (file instanceof TFile) {
@@ -435,6 +443,9 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			const newCount = this.folderCounts.get(folderPath) || 0;
 			this.updateFolderCount(folderPath, newCount);
 		}
+		
+		// Update All Notes count
+		this.updateAllNotesCount();
 	}
 
 	private refreshView(): void {
@@ -507,14 +518,6 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		return existingNumbers.length;
 	}
 
-	private async promptForFolderName(defaultName: string = ''): Promise<string | null> {
-		return new Promise((resolve) => {
-			const modal = new FolderNameModal(this.app, (result) => {
-				resolve(result);
-			}, defaultName);
-			modal.open();
-		});
-	}
 
 	// Active folder management methods
 	setActiveFolder(folderPath: string): void {
@@ -566,96 +569,3 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 }
 
-class FolderNameModal extends Modal {
-	private result: string | null = null;
-	private onSubmit: (result: string | null) => void;
-	private defaultName: string;
-
-	constructor(app: App, onSubmit: (result: string | null) => void, defaultName: string = '') {
-		super(app);
-		this.onSubmit = onSubmit;
-		this.defaultName = defaultName;
-	}
-
-	onOpen() {
-		const { contentEl } = this;
-		contentEl.createEl('h2', { text: 'Create New Folder' });
-
-		const inputContainer = contentEl.createDiv();
-		const input = inputContainer.createEl('input', {
-			type: 'text',
-			placeholder: 'Folder name...',
-			value: this.defaultName
-		});
-		input.style.width = '100%';
-		input.style.padding = '8px';
-		input.style.marginBottom = '16px';
-		input.style.border = '1px solid var(--background-modifier-border)';
-		input.style.borderRadius = '4px';
-		input.style.backgroundColor = 'var(--background-primary)';
-		input.style.color = 'var(--text-normal)';
-
-		const buttonContainer = contentEl.createDiv();
-		buttonContainer.style.display = 'flex';
-		buttonContainer.style.gap = '8px';
-		buttonContainer.style.justifyContent = 'flex-end';
-
-		const cancelBtn = buttonContainer.createEl('button', { text: 'Cancel' });
-		cancelBtn.style.padding = '8px 16px';
-		cancelBtn.style.border = '1px solid var(--background-modifier-border)';
-		cancelBtn.style.borderRadius = '4px';
-		cancelBtn.style.backgroundColor = 'var(--background-secondary)';
-		cancelBtn.style.color = 'var(--text-normal)';
-		cancelBtn.style.cursor = 'pointer';
-
-		const createBtn = buttonContainer.createEl('button', { text: 'Create' });
-		createBtn.style.padding = '8px 16px';
-		createBtn.style.border = 'none';
-		createBtn.style.borderRadius = '4px';
-		createBtn.style.backgroundColor = 'var(--interactive-accent)';
-		createBtn.style.color = 'var(--text-on-accent)';
-		createBtn.style.cursor = 'pointer';
-
-		// Event handlers
-		input.addEventListener('keydown', (e) => {
-			if (e.key === 'Enter') {
-				this.submit();
-			} else if (e.key === 'Escape') {
-				this.close();
-			}
-		});
-
-		cancelBtn.addEventListener('click', () => {
-			this.close();
-		});
-
-		createBtn.addEventListener('click', () => {
-			this.submit();
-		});
-
-		// Focus input and select text
-		input.focus();
-		input.select();
-	}
-
-	private submit() {
-		const input = this.contentEl.querySelector('input') as HTMLInputElement;
-		const value = input.value.trim();
-		
-		if (value) {
-			// Basic validation
-			if (value.includes('/') || value.includes('\\')) {
-				new Notice('Folder name cannot contain slashes');
-				return;
-			}
-			
-			this.result = value;
-		}
-		
-		this.close();
-	}
-
-	onClose() {
-		this.onSubmit(this.result);
-	}
-}
