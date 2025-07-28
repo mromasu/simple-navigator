@@ -28,6 +28,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private dragStartWidth = 0;
 	private fileElements: Map<string, FileItemElements> = new Map();
 	private groupElements: Map<string, GroupElements> = new Map();
+	private isAllNotesMode: boolean = false;
 
 	constructor(app: App, plugin: MyPlugin) {
 		this.app = app;
@@ -39,11 +40,20 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Only close button closes the container - no ESC key
 	}
 
-	openContainer(folder: TFolder): void {
+	openContainer(folder: TFolder): void;
+	openContainer(allNotes: 'ALL_NOTES'): void;
+	openContainer(target: TFolder | 'ALL_NOTES'): void {
 		// Close existing container if any
 		this.closeContainer();
 
-		this.currentFolder = folder;
+		if (target === 'ALL_NOTES') {
+			this.isAllNotesMode = true;
+			this.currentFolder = this.app.vault.getRoot(); // Use root for file operations
+		} else {
+			this.isAllNotesMode = false;
+			this.currentFolder = target;
+		}
+		
 		this.createContainer();
 		
 		// Register with VaultObserver for file system events
@@ -59,6 +69,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			this.container = null;
 			this.currentFolder = null;
 			this.resizeHandle = null;
+			this.isAllNotesMode = false;
 			
 			// Clear element tracking
 			this.fileElements.clear();
@@ -81,7 +92,12 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Create header
 		const header = this.container.createEl('div', { cls: 'folder-container-header' });
 		const title = header.createEl('h2', { cls: 'folder-container-title' });
-		title.textContent = this.currentFolder.isRoot() ? 'Notes' : this.currentFolder.name;
+		
+		if (this.isAllNotesMode) {
+			title.textContent = 'All Notes';
+		} else {
+			title.textContent = this.currentFolder.isRoot() ? 'Notes' : this.currentFolder.name;
+		}
 
 		// Create close button
 		const closeButton = header.createEl('button', { cls: 'folder-container-close' });
@@ -185,7 +201,14 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 		const files: TFile[] = [];
 
-		if (this.currentFolder.isRoot()) {
+		if (this.isAllNotesMode) {
+			// For All Notes mode: get ALL files from entire vault recursively
+			Vault.recurseChildren(this.app.vault.getRoot(), (file: TAbstractFile) => {
+				if (file instanceof TFile) {
+					files.push(file);
+				}
+			});
+		} else if (this.currentFolder.isRoot()) {
 			// For root folder: only direct children (no recursion)
 			for (const child of this.currentFolder.children) {
 				if (child instanceof TFile) {
@@ -420,7 +443,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private isFileInCurrentFolder(file: TAbstractFile): boolean {
 		if (!this.currentFolder) return false;
 		
-		if (this.currentFolder.isRoot()) {
+		if (this.isAllNotesMode) {
+			// For All Notes mode: all files in vault are relevant
+			return true;
+		} else if (this.currentFolder.isRoot()) {
 			// For root folder: check all files in vault
 			return true;
 		} else {
@@ -439,7 +465,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private isPathInCurrentFolder(path: string): boolean {
 		if (!this.currentFolder) return false;
 		
-		if (this.currentFolder.isRoot()) {
+		if (this.isAllNotesMode) {
+			// For All Notes mode: all paths are relevant
+			return true;
+		} else if (this.currentFolder.isRoot()) {
 			// For root folder: all paths are relevant
 			return true;
 		} else {
@@ -464,8 +493,15 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 	// Smart update methods for hybrid rendering
 	private async updateFileItem(file: TFile): Promise<void> {
+		console.log('[RENAME DEBUG] updateFileItem START', { filePath: file.path });
+		
 		const elements = this.fileElements.get(file.path);
-		if (!elements) return;
+		if (!elements) {
+			console.log('[RENAME DEBUG] updateFileItem - no elements found for path');
+			return;
+		}
+		
+		console.log('[RENAME DEBUG] updateFileItem - found elements, updating');
 		
 		// Update title
 		elements.title.textContent = file.basename;
@@ -484,6 +520,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 			elements.folderBadge = folderBadge;
 		}
+		
+		console.log('[RENAME DEBUG] updateFileItem END');
 	}
 
 	private addFileItem(file: TFile, groupName: string): void {
@@ -534,8 +572,15 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private removeFileItem(file: TFile): void {
+		console.log('[RENAME DEBUG] removeFileItem START', { filePath: file.path });
+		
 		const elements = this.fileElements.get(file.path);
-		if (!elements) return;
+		if (!elements) {
+			console.log('[RENAME DEBUG] removeFileItem - no elements found');
+			return;
+		}
+		
+		console.log('[RENAME DEBUG] removeFileItem - found elements, removing');
 		
 		// Remove the divider after this item (if exists)
 		const nextSibling = elements.container.nextSibling;
@@ -556,11 +601,21 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Check if group is now empty and remove if needed
 		const groupName = this.getTargetGroup(file);
 		this.removeEmptyGroup(groupName);
+		
+		console.log('[RENAME DEBUG] removeFileItem END');
 	}
 
 	private moveFileItem(file: TFile, oldGroupName: string, newGroupName: string): void {
+		console.log('[RENAME DEBUG] moveFileItem START', {
+			filePath: file.path,
+			oldGroupName,
+			newGroupName
+		});
+		
 		this.removeFileItem(file);
 		this.addFileItem(file, newGroupName);
+		
+		console.log('[RENAME DEBUG] moveFileItem END');
 	}
 
 	private ensureGroupExists(groupName: string): void {
@@ -616,13 +671,23 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
 		const fileDateOnly = new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate());
 		
+		let groupName: string;
 		if (fileDateOnly.getTime() === today.getTime()) {
-			return 'Today';
+			groupName = 'Today';
 		} else if (fileDateOnly.getTime() === yesterday.getTime()) {
-			return 'Yesterday';
+			groupName = 'Yesterday';
 		} else {
-			return this.formatDateGroup(fileDate);
+			groupName = this.formatDateGroup(fileDate);
 		}
+		
+		console.log('[RENAME DEBUG] getTargetGroup', {
+			filePath: file.path,
+			modTime: file.stat.mtime,
+			fileDate: fileDate.toISOString(),
+			groupName
+		});
+		
+		return groupName;
 	}
 
 	private getFilesInGroup(groupName: string): TFile[] {
@@ -689,34 +754,77 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	handleFileRename(file: TAbstractFile, oldPath: string, affectedFolders: string[]): void {
-		if (!this.container || !this.currentFolder) return;
+		console.log('[RENAME DEBUG] handleFileRename START', {
+			oldPath,
+			newPath: file.path,
+			fileName: file instanceof TFile ? file.basename : file.name,
+			container: !!this.container,
+			currentFolder: this.currentFolder?.path
+		});
+		
+		if (!this.container || !this.currentFolder) {
+			console.log('[RENAME DEBUG] Early return - no container or folder');
+			return;
+		}
 		
 		// Check if file was or is now in current folder
 		const wasInFolder = this.isPathInCurrentFolder(oldPath);
 		const isInFolder = this.isFileInCurrentFolder(file);
 		
+		console.log('[RENAME DEBUG] Folder checks', {
+			wasInFolder,
+			isInFolder,
+			oldPath,
+			newPath: file.path
+		});
+		
 		if (file instanceof TFile) {
+			// Log current Map state
+			console.log('[RENAME DEBUG] Current fileElements keys:', Array.from(this.fileElements.keys()));
+			console.log('[RENAME DEBUG] Element lookup by oldPath:', this.fileElements.has(oldPath));
+			console.log('[RENAME DEBUG] Element lookup by newPath:', this.fileElements.has(file.path));
+			
 			if (wasInFolder && isInFolder) {
+				console.log('[RENAME DEBUG] File renamed within current folder');
+				
 				// File was renamed within current folder
 				const oldGroupName = this.getTargetGroupFromPath(oldPath);
 				const newGroupName = this.getTargetGroup(file);
 				
+				console.log('[RENAME DEBUG] Group determination', {
+					oldGroupName,
+					newGroupName,
+					oldPath,
+					newPath: file.path
+				});
+				
+				// Update element map key BEFORE any operations
+				this.updateElementMapKey(oldPath, file.path);
+				
 				if (oldGroupName === newGroupName) {
+					console.log('[RENAME DEBUG] Same group - updating file item');
 					// Same group, just update the file item
 					this.updateFileItem(file);
 				} else {
+					console.log('[RENAME DEBUG] Different group - moving file item');
 					// Different group, move the file
 					this.moveFileItem(file, oldGroupName, newGroupName);
 				}
 			} else if (wasInFolder && !isInFolder) {
+				console.log('[RENAME DEBUG] File moved out of current folder');
 				// File was moved out of current folder
 				this.removeFileItem(file);
 			} else if (!wasInFolder && isInFolder) {
+				console.log('[RENAME DEBUG] File moved into current folder');
 				// File was moved into current folder
 				const groupName = this.getTargetGroup(file);
 				this.addFileItem(file, groupName);
+			} else {
+				console.log('[RENAME DEBUG] File rename not relevant to current folder');
 			}
 		}
+		
+		console.log('[RENAME DEBUG] handleFileRename END');
 	}
 
 	handleFileModify(file: TAbstractFile, affectedFolders: string[]): void {
@@ -743,19 +851,52 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private getTargetGroupFromPath(filePath: string): string {
-		// This is a simplified version - in a real implementation,
-		// we'd need to get the modification time from the old file
-		// For now, assume it stays in the same group
+		console.log('[RENAME DEBUG] getTargetGroupFromPath START', { filePath });
+		
+		// Try to find element by old path first
 		const elements = this.fileElements.get(filePath);
+		console.log('[RENAME DEBUG] getTargetGroupFromPath elements lookup', {
+			filePath,
+			found: !!elements,
+			availableKeys: Array.from(this.fileElements.keys())
+		});
+		
 		if (elements) {
 			// Find which group this element belongs to
 			for (const [groupName, groupElements] of this.groupElements.entries()) {
 				if (groupElements.groupContainer.contains(elements.container)) {
+					console.log('[RENAME DEBUG] getTargetGroupFromPath found group', { groupName });
 					return groupName;
 				}
 			}
+			console.log('[RENAME DEBUG] getTargetGroupFromPath no containing group found');
 		}
-		return 'Today'; // fallback
+		
+		// Fallback: try to find the element by searching all file elements
+		console.log('[RENAME DEBUG] getTargetGroupFromPath trying DOM fallback');
+		for (const [path, elementsData] of this.fileElements.entries()) {
+			// Check if this could be the same file (same basename)
+			const oldBasename = filePath.split('/').pop()?.split('.')[0];
+			const currentBasename = path.split('/').pop()?.split('.')[0];
+			
+			if (oldBasename === currentBasename) {
+				console.log('[RENAME DEBUG] getTargetGroupFromPath found potential match by basename', { 
+					oldPath: filePath, 
+					currentPath: path 
+				});
+				
+				// Find which group this element belongs to
+				for (const [groupName, groupElements] of this.groupElements.entries()) {
+					if (groupElements.groupContainer.contains(elementsData.container)) {
+						console.log('[RENAME DEBUG] getTargetGroupFromPath found group via DOM fallback', { groupName });
+						return groupName;
+					}
+				}
+			}
+		}
+		
+		console.log('[RENAME DEBUG] getTargetGroupFromPath using final fallback: Today');
+		return 'Today'; // final fallback
 	}
 
 	private getCurrentGroupForFile(file: TFile): string {
@@ -769,5 +910,22 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			}
 		}
 		return this.getTargetGroup(file); // fallback to calculated group
+	}
+
+	private updateElementMapKey(oldPath: string, newPath: string): void {
+		console.log('[RENAME DEBUG] updateElementMapKey START', { oldPath, newPath });
+		
+		const elements = this.fileElements.get(oldPath);
+		if (elements) {
+			console.log('[RENAME DEBUG] Found elements for oldPath, updating key');
+			// Update the map key
+			this.fileElements.delete(oldPath);
+			this.fileElements.set(newPath, elements);
+			console.log('[RENAME DEBUG] Map key updated successfully');
+		} else {
+			console.log('[RENAME DEBUG] No elements found for oldPath');
+		}
+		
+		console.log('[RENAME DEBUG] Updated fileElements keys:', Array.from(this.fileElements.keys()));
 	}
 }

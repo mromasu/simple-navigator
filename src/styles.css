@@ -163,6 +163,36 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-modifier-hover);
 }
 
+/* All Notes styling */
+.folder-item.all-notes-header {
+	margin-bottom: 8px;
+}
+
+.folder-item.all-notes-header .folder-header {
+	font-weight: 600;
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-radius: 6px;
+	transition: background-color 0.1s ease;
+}
+
+.folder-item.all-notes-header .folder-header:hover {
+	background-color: var(--interactive-accent-hover);
+}
+
+.all-notes-icon {
+	color: var(--text-on-accent);
+}
+
+.all-notes-name {
+	color: var(--text-on-accent);
+}
+
+.all-notes-count {
+	color: var(--text-on-accent);
+	font-weight: 600;
+}
+
 /* Folder container styles */
 .workspace-split.mod-horizontal.mod-sidedock.mod-left-extend {
 	width: 300px;
@@ -247,7 +277,7 @@ button.folder-container-close {
 
 /* File Items */
 .file-item {
-	padding: 12px;
+	padding: 8px 10px;
 	cursor: pointer;
 	transition: background-color 0.1s ease;
 }
@@ -257,7 +287,7 @@ button.folder-container-close {
 }
 
 .file-item-content {
-	margin-bottom: 6px;
+	margin-bottom: 2px;
 }
 
 .file-item-title {
@@ -271,7 +301,7 @@ button.folder-container-close {
 .file-item-preview {
 	font-size: 13px;
 	color: var(--text-muted);
-	line-height: 1.4;
+	line-height: 1.2;
 	overflow: hidden;
 	display: -webkit-box;
 	-webkit-line-clamp: 1;
@@ -318,11 +348,14 @@ button.folder-container-close {
     border-width: var(--divider-width);
     margin: 0;
     transition: background-color .2s ease-in-out,border-color .2s ease-in-out,opacity .2s ease-in-out;
-    -webkit-app-region: no-drag;
+    transition: opacity .0s;
+	-webkit-app-region: no-drag;
+	opacity: 0;
 }
 
 .workspace-split.mod-horizontal.mod-sidedock.mod-left-extend .resize-handle:hover {
 	background: var(--interactive-accent);
+	opacity: 1;
 }
 
 /* Motion sensitivity support */

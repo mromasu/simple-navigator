@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import { FolderContainerManager } from './folder-container-manager';
 import MyPlugin from './main';
@@ -102,6 +102,9 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		
 		const rootFolder = this.app.vault.getRoot();
 		
+		// Render "All Notes" at the top
+		this.renderAllNotesHeader(container);
+		
 		// Render root folder as a non-collapsible header
 		this.renderRootHeader(rootFolder, container);
 		
@@ -157,6 +160,33 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			count: countEl,
 			chevron: chevronContainer
 		});
+	}
+
+	private renderAllNotesHeader(container: HTMLElement): void {
+		const allNotesEl = container.createEl('div', { cls: 'folder-item all-notes-header' });
+		
+		const header = allNotesEl.createEl('div', { cls: 'folder-header' });
+		
+		// Add click handler for All Notes header
+		header.addEventListener('click', () => {
+			this.containerManager.openContainer('ALL_NOTES');
+		});
+		
+		// All Notes icon (using a special icon)
+		const folderIconContainer = header.createEl('span', { cls: 'folder-icon' });
+		const folderIcon = this.createLucideIcon('M4 4h16v2H4V4zm0 4h16v2H4V8zm0 4h16v2H4v-2zm0 4h10v2H4v-2z', 'all-notes-icon');
+		folderIconContainer.appendChild(folderIcon);
+		
+		// All Notes name
+		const folderName = header.createEl('span', { cls: 'folder-name all-notes-name' });
+		folderName.textContent = 'All Notes';
+		
+		// Total file count
+		const totalCount = this.getTotalFileCount();
+		const countEl = header.createEl('span', { cls: 'folder-count all-notes-count' });
+		countEl.textContent = totalCount.toString();
+		
+		// No chevron for All Notes (it's not expandable)
 	}
 
 	private renderFolder(folder: TFolder, parent: HTMLElement, depth: number): void {
@@ -261,6 +291,16 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		};
 		
 		processFolder(this.app.vault.getRoot());
+	}
+
+	private getTotalFileCount(): number {
+		let totalCount = 0;
+		Vault.recurseChildren(this.app.vault.getRoot(), (file: TAbstractFile) => {
+			if (file instanceof TFile) {
+				totalCount++;
+			}
+		});
+		return totalCount;
 	}
 
 	private toggleFolder(folderPath: string): void {
