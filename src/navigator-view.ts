@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault, Notice } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFolder, TFile, TAbstractFile, Vault, Notice, Menu } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import { FolderContainerManager } from './folder-container-manager';
 import MyPlugin from './main';
@@ -143,6 +143,12 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			}
 		});
 
+		// Add context menu handler for root folder
+		rootHeader.addEventListener('contextmenu', (e) => {
+			e.preventDefault();
+			this.showFolderContextMenu(e, rootFolder);
+		});
+
 		// Root folder icon (always closed folder icon since it's not collapsible)
 		const folderIconContainer = rootHeader.createEl('span', { cls: 'folder-icon' });
 		const folderIcon = this.getFolderIcon(false, true);
@@ -210,6 +216,12 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			if (target && !target.closest('.folder-chevron-container')) {
 				this.containerManager.openContainer(folder);
 			}
+		});
+
+		// Add context menu handler for folder
+		folderHeader.addEventListener('contextmenu', (e) => {
+			e.preventDefault();
+			this.showFolderContextMenu(e, folder);
 		});
 		
 		const hasChildren = folder.children.some(child => child instanceof TFolder);
@@ -564,6 +576,128 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			const allNotesEl = this.containerEl.querySelector('.all-notes-header');
 			if (allNotesEl) {
 				allNotesEl.removeClass('folder-active');
+			}
+		}
+	}
+
+	private showFolderContextMenu(event: MouseEvent, folder: TFolder): void {
+		const menu = new Menu();
+		
+		// Create new file in folder
+		menu.addItem((item) => {
+			item.setTitle('New note')
+				.setIcon('file-plus')
+				.onClick(() => {
+					this.createNewFileInFolder(folder);
+				});
+		});
+
+		// Create new folder in folder
+		menu.addItem((item) => {
+			item.setTitle('New folder')
+				.setIcon('folder-plus')
+				.onClick(() => {
+					this.createNewFolderInFolder(folder);
+				});
+		});
+
+		menu.addSeparator();
+
+		// Rename folder (only for non-root folders)
+		if (folder.path !== '') {
+			menu.addItem((item) => {
+				item.setTitle('Rename')
+					.setIcon('pencil')
+					.onClick(() => {
+						this.renameFolderPrompt(folder);
+					});
+			});
+		}
+
+		// Delete folder (only for non-root folders)
+		if (folder.path !== '') {
+			menu.addItem((item) => {
+				item.setTitle('Delete folder')
+					.setIcon('trash')
+					.onClick(() => {
+						this.deleteFolderPrompt(folder);
+					});
+			});
+		}
+
+		menu.showAtMouseEvent(event);
+	}
+
+	private async createNewFileInFolder(folder: TFolder): Promise<void> {
+		const fileName = 'Untitled.md';
+		const filePath = folder.path ? `${folder.path}/${fileName}` : fileName;
+		
+		// Generate unique filename if already exists
+		let finalPath = filePath;
+		let counter = 1;
+		while (await this.app.vault.adapter.exists(finalPath)) {
+			const baseName = fileName.replace('.md', '');
+			finalPath = folder.path ? `${folder.path}/${baseName} ${counter}.md` : `${baseName} ${counter}.md`;
+			counter++;
+		}
+
+		try {
+			const file = await this.app.vault.create(finalPath, '');
+			// Open the newly created file
+			this.app.workspace.getLeaf().openFile(file);
+		} catch (error) {
+			console.error('Failed to create file:', error);
+			new Notice(`Failed to create file: ${error.message}`);
+		}
+	}
+
+	private async createNewFolderInFolder(folder: TFolder): Promise<void> {
+		const folderName = 'New folder';
+		const folderPath = folder.path ? `${folder.path}/${folderName}` : folderName;
+		
+		// Generate unique folder name if already exists
+		let finalPath = folderPath;
+		let counter = 1;
+		while (await this.app.vault.adapter.exists(finalPath)) {
+			finalPath = folder.path ? `${folder.path}/${folderName} ${counter}` : `${folderName} ${counter}`;
+			counter++;
+		}
+
+		try {
+			await this.app.vault.createFolder(finalPath);
+		} catch (error) {
+			console.error('Failed to create folder:', error);
+			new Notice(`Failed to create folder: ${error.message}`);
+		}
+	}
+
+	private async renameFolderPrompt(folder: TFolder): Promise<void> {
+		const newName = prompt('Enter new folder name:', folder.name);
+		if (newName && newName !== folder.name) {
+			const parentPath = folder.parent?.path || '';
+			const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+			
+			try {
+				await this.app.vault.rename(folder, newPath);
+			} catch (error) {
+				console.error('Failed to rename folder:', error);
+				new Notice(`Failed to rename folder: ${error.message}`);
+			}
+		}
+	}
+
+	private async deleteFolderPrompt(folder: TFolder): Promise<void> {
+		const folderContents = folder.children.length;
+		const message = folderContents > 0 
+			? `Delete folder "${folder.name}" and all its contents (${folderContents} items)?`
+			: `Delete folder "${folder.name}"?`;
+			
+		if (confirm(message)) {
+			try {
+				await this.app.vault.delete(folder);
+			} catch (error) {
+				console.error('Failed to delete folder:', error);
+				new Notice(`Failed to delete folder: ${error.message}`);
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-import { App, TFolder, TFile, TAbstractFile, Vault } from 'obsidian';
+import { App, TFolder, TFile, TAbstractFile, Vault, Menu } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import MyPlugin from './main';
 import { NavigatorView } from './navigator-view';
@@ -390,6 +390,12 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Click handler
 		item.addEventListener('click', () => {
 			this.app.workspace.openLinkText(file.path, '', false);
+		});
+
+		// Context menu handler
+		item.addEventListener('contextmenu', (e) => {
+			e.preventDefault();
+			this.showFileContextMenu(e, file);
 		});
 		
 		// Load content and image with proper coordination
@@ -1304,6 +1310,118 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			
 		} catch (error) {
 			console.error('Failed to create new note:', error);
+		}
+	}
+
+	private showFileContextMenu(event: MouseEvent, file: TFile): void {
+		const menu = new Menu();
+		
+		// Open in new tab
+		menu.addItem((item) => {
+			item.setTitle('Open in new tab')
+				.setIcon('external-link')
+				.onClick(() => {
+					this.app.workspace.getLeaf('tab').openFile(file);
+				});
+		});
+
+		// Open in new pane (split)
+		menu.addItem((item) => {
+			item.setTitle('Open in new pane')
+				.setIcon('separator-vertical')
+				.onClick(() => {
+					this.app.workspace.getLeaf('split', 'vertical').openFile(file);
+				});
+		});
+
+		menu.addSeparator();
+
+		// Rename file
+		menu.addItem((item) => {
+			item.setTitle('Rename')
+				.setIcon('pencil')
+				.onClick(() => {
+					this.renameFilePrompt(file);
+				});
+		});
+
+		// Move file
+		menu.addItem((item) => {
+			item.setTitle('Move to folder')
+				.setIcon('folder-open')
+				.onClick(() => {
+					this.moveFilePrompt(file);
+				});
+		});
+
+		menu.addSeparator();
+
+		// Copy file path
+		menu.addItem((item) => {
+			item.setTitle('Copy path')
+				.setIcon('copy')
+				.onClick(() => {
+					navigator.clipboard.writeText(file.path);
+				});
+		});
+
+		// Delete file
+		menu.addItem((item) => {
+			item.setTitle('Delete')
+				.setIcon('trash')
+				.onClick(() => {
+					this.deleteFilePrompt(file);
+				});
+		});
+
+		menu.showAtMouseEvent(event);
+	}
+
+	private async renameFilePrompt(file: TFile): Promise<void> {
+		const newName = prompt('Enter new file name:', file.basename);
+		if (newName && newName !== file.basename) {
+			const newPath = file.parent ? `${file.parent.path}/${newName}.md` : `${newName}.md`;
+			
+			try {
+				await this.app.vault.rename(file, newPath);
+			} catch (error) {
+				console.error('Failed to rename file:', error);
+			}
+		}
+	}
+
+	private async moveFilePrompt(file: TFile): Promise<void> {
+		// Get all folders in the vault
+		const folders = this.app.vault.getAllLoadedFiles()
+			.filter(f => f instanceof TFolder) as TFolder[];
+		
+		// Create a simple selection prompt (in a real implementation, you might want a modal)
+		const folderNames = folders.map(f => f.path === '' ? 'Root' : f.path);
+		const selectedFolder = prompt(
+			`Move "${file.basename}" to folder:\n\nAvailable folders:\n${folderNames.join('\n')}\n\nEnter folder path (or "Root" for root folder):`,
+			file.parent?.path || 'Root'
+		);
+		
+		if (selectedFolder !== null && selectedFolder !== (file.parent?.path || 'Root')) {
+			const targetPath = selectedFolder === 'Root' || selectedFolder === '' 
+				? file.name 
+				: `${selectedFolder}/${file.name}`;
+			
+			try {
+				await this.app.vault.rename(file, targetPath);
+			} catch (error) {
+				console.error('Failed to move file:', error);
+			}
+		}
+	}
+
+	private async deleteFilePrompt(file: TFile): Promise<void> {
+		if (confirm(`Delete "${file.basename}"?`)) {
+			try {
+				await this.app.vault.delete(file);
+			} catch (error) {
+				console.error('Failed to delete file:', error);
+			}
 		}
 	}
 }
