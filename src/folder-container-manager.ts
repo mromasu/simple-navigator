@@ -232,8 +232,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			});
 		}
 
-		// Sort by modification time (newest first)
-		return files.sort((a, b) => b.stat.mtime - a.stat.mtime);
+		// Sort by creation time (newest first)
+		return files.sort((a, b) => b.stat.ctime - a.stat.ctime);
 	}
 
 	private groupFilesByDate(files: TFile[]): Record<string, TFile[]> {
@@ -247,7 +247,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
 
 		for (const file of files) {
-			const fileDate = new Date(file.stat.mtime);
+			const fileDate = new Date(file.stat.ctime);
 			const fileDateOnly = new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate());
 
 			if (fileDateOnly.getTime() === today.getTime()) {
@@ -543,7 +543,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Get sorted position for the file
 		const files = this.getFilesInGroup(groupName);
 		files.push(file);
-		files.sort((a, b) => b.stat.mtime - a.stat.mtime);
+		files.sort((a, b) => b.stat.ctime - a.stat.ctime);
 		
 		const insertIndex = files.indexOf(file);
 		const existingItems = Array.from(groupElements.groupContainer.querySelectorAll('.file-item'));
@@ -673,7 +673,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private getTargetGroup(file: TFile): string {
-		const fileDate = new Date(file.stat.mtime);
+		const fileDate = new Date(file.stat.ctime);
 		const now = new Date();
 		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
@@ -690,7 +690,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		console.log('[RENAME DEBUG] getTargetGroup', {
 			filePath: file.path,
-			modTime: file.stat.mtime,
+			ctime: file.stat.ctime,
 			fileDate: fileDate.toISOString(),
 			groupName
 		});
