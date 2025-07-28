@@ -244,6 +244,30 @@ button.folder-container-close {
 	color: var(--text-normal);
 }
 
+.mod-left-extend
+button.folder-container-new-note {
+	background: none;
+	border: none;
+	font-size: 18px;
+	font-weight: bold;
+	color: var(--interactive-accent);
+	cursor: pointer;
+	padding: 4px 8px;
+	border-radius: 4px;
+	transition: background-color 0.1s ease, color 0.1s ease;
+	box-shadow: none;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.folder-container-new-note:hover {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
 .folder-container-content {
 	flex: 1 0 auto;
 	overflow-y: auto;

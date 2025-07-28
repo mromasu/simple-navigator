@@ -91,6 +91,14 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 		// Create header
 		const header = this.container.createEl('div', { cls: 'folder-container-header' });
+		
+		// Create new note button (left side)
+		const newNoteButton = header.createEl('button', { cls: 'folder-container-new-note' });
+		newNoteButton.innerHTML = '+';
+		newNoteButton.title = 'Create new note';
+		newNoteButton.addEventListener('click', () => this.createNewNote());
+		
+		// Create title (center)
 		const title = header.createEl('h2', { cls: 'folder-container-title' });
 		
 		if (this.isAllNotesMode) {
@@ -99,7 +107,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			title.textContent = this.currentFolder.isRoot() ? 'Notes' : this.currentFolder.name;
 		}
 
-		// Create close button
+		// Create close button (right side)
 		const closeButton = header.createEl('button', { cls: 'folder-container-close' });
 		closeButton.innerHTML = '×';
 		closeButton.addEventListener('click', () => this.closeContainer());
@@ -927,5 +935,39 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 		
 		console.log('[RENAME DEBUG] Updated fileElements keys:', Array.from(this.fileElements.keys()));
+	}
+
+	private async createNewNote(): Promise<void> {
+		if (!this.currentFolder) return;
+		
+		try {
+			// Determine the target folder for the new note
+			let targetFolder: TFolder;
+			
+			if (this.isAllNotesMode) {
+				// In All Notes mode, create in root folder
+				targetFolder = this.app.vault.getRoot();
+			} else {
+				// In specific folder mode, create in current folder
+				targetFolder = this.currentFolder;
+			}
+			
+			// Generate a unique file name
+			const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+			const fileName = `Untitled ${timestamp}.md`;
+			const filePath = targetFolder.path ? `${targetFolder.path}/${fileName}` : fileName;
+			
+			// Create the new file
+			const newFile = await this.app.vault.create(filePath, '');
+			
+			// Open the new file in the main editor
+			await this.app.workspace.openLinkText(newFile.path, '', false);
+			
+			// Close the container to give focus to the editor
+			this.closeContainer();
+			
+		} catch (error) {
+			console.error('Failed to create new note:', error);
+		}
 	}
 }
