@@ -132,45 +132,39 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	private renderRootHeader(rootFolder: TFolder, container: HTMLElement): void {
 		const rootEl = container.createEl('div', { cls: 'folder-item root-header' });
 		rootEl.setAttribute('data-folder-path', rootFolder.path);
-		
+
 		const rootHeader = rootEl.createEl('div', { cls: 'folder-header' });
-		
+
 		// Add click handler for root folder header (excluding chevron)
 		rootHeader.addEventListener('click', (e) => {
-			// Prevent if clicking chevron
 			const target = e.target as HTMLElement;
-			if (target && !target.closest('.folder-chevron-container')) {
+			if (target) {
 				this.containerManager.openContainer(rootFolder);
 			}
 		});
-		
+
 		// Root folder icon (always closed folder icon since it's not collapsible)
 		const folderIconContainer = rootHeader.createEl('span', { cls: 'folder-icon' });
 		const folderIcon = this.getFolderIcon(false, true);
 		folderIconContainer.appendChild(folderIcon);
-		
+
 		// Root folder name
 		const folderName = rootHeader.createEl('span', { cls: 'folder-name' });
 		folderName.textContent = 'Notes';
-		
+
 		// Root folder note count (root files only, no subfolders)
 		const noteCount = this.rootOnlyCount;
 		const countEl = rootHeader.createEl('span', { cls: 'folder-count' });
 		countEl.textContent = noteCount.toString();
-		
-		// Add non-interactive chevron for aesthetic consistency
-		const chevronContainer = rootHeader.createEl('span', { cls: 'folder-chevron-container non-clickable' });
-		const chevron = this.getChevronIcon(false);
-		chevron.addClass('non-interactive');
-		chevronContainer.appendChild(chevron);
-		
+
+		// Removed chevron span for root header
+
 		// Store element references for updates (no children for root)
 		this.folderElements.set(rootFolder.path, {
 			container: rootEl,
 			header: rootHeader,
 			icon: folderIconContainer,
-			count: countEl,
-			chevron: chevronContainer
+			count: countEl
 		});
 	}
 

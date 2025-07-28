@@ -68,6 +68,7 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	display: flex;
 	align-items: center;
 	padding: 4px 8px;
+	padding-right: 4px;
 	border-radius: 4px;
 	cursor: pointer;
 	transition: background-color 0.1s ease;
@@ -156,7 +157,7 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 }
 
 .folder-count {
-	font-size: 12px;
+	font-size: 13px;
 	color: var(--text-muted);
 	flex-shrink: 0;
 }
@@ -194,9 +195,14 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	color: var(--text-on-accent);
 }
 
+.folder-item.root-header .folder-count,
+.folder-item.all-notes-header .folder-count{
+	margin-right: 6px;
+}
+
 /* All Notes styling - default subtle appearance */
 .folder-item.all-notes-header {
-	margin-bottom: 8px;
+	margin-bottom: 2px;
 }
 
 .folder-item.all-notes-header .folder-header {
