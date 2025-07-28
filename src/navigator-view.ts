@@ -465,16 +465,10 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	private async createNewFolder(): Promise<void> {
 		// Generate default folder name
 		const nextNumber = this.getNextUntitledFolderNumber();
-		const defaultName = nextNumber === 0 ? 'Untitled' : `Untitled ${nextNumber}`;
-		
-		const folderName = await this.promptForFolderName(defaultName);
-		if (!folderName) return;
-
-		// Create folder in root directory
-		const folderPath = folderName;
+		const folderName = nextNumber === 0 ? 'Untitled' : `Untitled ${nextNumber}`;
 		
 		try {
-			await this.app.vault.createFolder(folderPath);
+			await this.app.vault.createFolder(folderName);
 			// The VaultObserver will handle updating the UI automatically
 		} catch (error) {
 			console.error('Failed to create folder:', error);
