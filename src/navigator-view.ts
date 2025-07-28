@@ -463,7 +463,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 
 	private async createNewFolder(): Promise<void> {
-		const folderName = await this.promptForFolderName();
+		// Generate default folder name
+		const nextNumber = this.getNextUntitledFolderNumber();
+		const defaultName = nextNumber === 0 ? 'Untitled' : `Untitled ${nextNumber}`;
+		
+		const folderName = await this.promptForFolderName(defaultName);
 		if (!folderName) return;
 
 		// Create folder in root directory
@@ -479,11 +483,47 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		}
 	}
 
-	private async promptForFolderName(): Promise<string | null> {
+	private getNextUntitledFolderNumber(): number {
+		const rootFolder = this.app.vault.getRoot();
+		const folders = rootFolder.children.filter(child => child instanceof TFolder) as TFolder[];
+		const untitledPattern = /^Untitled( (\d+))?$/;
+		const existingNumbers: number[] = [];
+
+		for (const folder of folders) {
+			const match = folder.name.match(untitledPattern);
+			if (match) {
+				if (match[2]) {
+					// Folder has a number (e.g., "Untitled 2")
+					existingNumbers.push(parseInt(match[2], 10));
+				} else {
+					// Folder is just "Untitled" (treat as number 0)
+					existingNumbers.push(0);
+				}
+			}
+		}
+
+		// Find the next available number
+		if (existingNumbers.length === 0) {
+			return 0; // Start with "Untitled"
+		}
+
+		existingNumbers.sort((a, b) => a - b);
+		
+		// Find the first gap or return the next number after the highest
+		for (let i = 0; i < existingNumbers.length; i++) {
+			if (existingNumbers[i] !== i) {
+				return i;
+			}
+		}
+		
+		return existingNumbers.length;
+	}
+
+	private async promptForFolderName(defaultName: string = ''): Promise<string | null> {
 		return new Promise((resolve) => {
 			const modal = new FolderNameModal(this.app, (result) => {
 				resolve(result);
-			});
+			}, defaultName);
 			modal.open();
 		});
 	}
@@ -541,10 +581,12 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 class FolderNameModal extends Modal {
 	private result: string | null = null;
 	private onSubmit: (result: string | null) => void;
+	private defaultName: string;
 
-	constructor(app: App, onSubmit: (result: string | null) => void) {
+	constructor(app: App, onSubmit: (result: string | null) => void, defaultName: string = '') {
 		super(app);
 		this.onSubmit = onSubmit;
+		this.defaultName = defaultName;
 	}
 
 	onOpen() {
@@ -554,7 +596,8 @@ class FolderNameModal extends Modal {
 		const inputContainer = contentEl.createDiv();
 		const input = inputContainer.createEl('input', {
 			type: 'text',
-			placeholder: 'Folder name...'
+			placeholder: 'Folder name...',
+			value: this.defaultName
 		});
 		input.style.width = '100%';
 		input.style.padding = '8px';
@@ -602,8 +645,9 @@ class FolderNameModal extends Modal {
 			this.submit();
 		});
 
-		// Focus input
+		// Focus input and select text
 		input.focus();
+		input.select();
 	}
 
 	private submit() {
