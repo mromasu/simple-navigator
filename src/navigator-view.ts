@@ -463,14 +463,6 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		}
 	}
 
-	private updateAllNotesCount(): void {
-		const totalCount = this.getTotalFileCount();
-		const allNotesCountEl = this.containerEl.querySelector('.all-notes-count');
-		if (allNotesCountEl) {
-			allNotesCountEl.textContent = totalCount.toString();
-		}
-	}
-
 	// VaultUpdateHandler interface implementation
 	handleFileCreate(file: TAbstractFile, affectedFolders: string[]): void {
 		if (file instanceof TFile) {
@@ -510,45 +502,27 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 
 	private updateCountsForAffectedFolders(): void {
-		// Store previous counts to detect changes
-		const previousCounts = new Map(this.folderCounts);
-		const previousRootOnlyCount = this.rootOnlyCount;
-		
-		// Get root folder path for comparison
-		const rootFolder = this.app.vault.getRoot();
-		const rootFolderPath = rootFolder.path;
-		
-		// Recalculate counts
+		// Recalculate all counts
 		this.calculateFolderCounts();
+
+		const rootPath = this.app.vault.getRoot().path;
+		const totalCount = this.folderCounts.get(rootPath) || 0;
+
+		// Update All Notes count
+		const allNotesCountEl = this.containerEl.querySelector('.all-notes-count');
+		if (allNotesCountEl) {
+			allNotesCountEl.textContent = totalCount.toString();
+		}
 		
-		// Update displays for ALL folders that have changed counts, not just affected ones
-		// Skip the root folder as it needs special handling
-		for (const [folderPath, newCount] of this.folderCounts.entries()) {
-			if (folderPath === rootFolderPath) continue; // Skip root folder - handle separately
-			
-			const previousCount = previousCounts.get(folderPath) || 0;
-			if (newCount !== previousCount) {
-				this.updateFolderCount(folderPath, newCount);
+		// Update all visible folder counts
+		for (const [folderPath, elements] of this.folderElements.entries()) {
+			let newCount: number;
+			if (folderPath === rootPath) {
+				newCount = this.rootOnlyCount;
+			} else {
+				newCount = this.folderCounts.get(folderPath) || 0;
 			}
-		}
-		
-		// Handle root folder separately using rootOnlyCount
-		if (this.rootOnlyCount !== previousRootOnlyCount) {
-			this.updateFolderCount(rootFolderPath, this.rootOnlyCount);
-		}
-		
-		// Also check for folders that were removed (count now 0 or undefined)
-		for (const [folderPath, previousCount] of previousCounts.entries()) {
-			if (!this.folderCounts.has(folderPath) && previousCount > 0) {
-				this.updateFolderCount(folderPath, 0);
-			}
-		}
-		
-		// Update All Notes count if it changed
-		const currentTotalCount = this.getTotalFileCount();
-		const previousTotalCount = Array.from(previousCounts.values()).reduce((sum, count) => sum + count, 0);
-		if (currentTotalCount !== previousTotalCount) {
-			this.updateAllNotesCount();
+			elements.count.textContent = newCount.toString();
 		}
 	}
 
