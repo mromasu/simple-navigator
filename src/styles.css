@@ -191,8 +191,7 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 }
 
 .folder-item.root-header .folder-header:hover {
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
+	background-color: var(--background-modifier-hover);
 }
 
 .folder-item.root-header .folder-count,
@@ -229,36 +228,22 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	font-weight: 600;
 }
 
-/* All Notes active state - only when actually selected */
-.folder-item.all-notes-header.folder-active .folder-header {
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
-}
-
-.folder-item.all-notes-header.folder-active .folder-header:hover {
-	background-color: var(--interactive-accent-hover);
-}
-
-.folder-item.all-notes-header.folder-active .all-notes-icon,
-.folder-item.all-notes-header.folder-active .all-notes-name,
-.folder-item.all-notes-header.folder-active .all-notes-count {
-	color: var(--text-on-accent);
-}
-
-/* Active folder state - when container is open */
+/* --- Unified highlighted (active) folder style for all types --- */
 .folder-item.folder-active .folder-header {
-	background-color: var(--interactive-accent);
-	color: var(--text-on-accent);
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
 }
-
+.folder-item.folder-active .folder-header:hover {
+    background-color: var(--interactive-accent-hover);
+}
 .folder-item.folder-active .folder-name,
 .folder-item.folder-active .folder-count,
-.folder-item.folder-active .folder-chevron {
-	color: var(--text-on-accent) !important;
-}
-
-.folder-item.folder-active .folder-icon svg {
-	color: var(--text-on-accent);
+.folder-item.folder-active .folder-chevron,
+.folder-item.folder-active .folder-icon svg,
+.folder-item.folder-active .all-notes-icon,
+.folder-item.folder-active .all-notes-name,
+.folder-item.folder-active .all-notes-count {
+    color: var(--text-on-accent) !important;
 }
 
 /* Folder container styles */
