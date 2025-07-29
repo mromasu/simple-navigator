@@ -1347,7 +1347,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 		// Move file
 		menu.addItem((item) => {
-			item.setTitle('Move file to another folder')
+			item.setTitle('Move file')
 				.setIcon('folder-open')
 				.onClick(() => {
 					// Execute Obsidian's native move file command
