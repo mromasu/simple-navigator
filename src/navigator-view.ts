@@ -512,16 +512,25 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	private updateCountsForAffectedFolders(): void {
 		// Store previous counts to detect changes
 		const previousCounts = new Map(this.folderCounts);
+		const previousRootOnlyCount = this.rootOnlyCount;
 		
 		// Recalculate counts
 		this.calculateFolderCounts();
 		
 		// Update displays for ALL folders that have changed counts, not just affected ones
+		// Skip the root folder ("") as it needs special handling
 		for (const [folderPath, newCount] of this.folderCounts.entries()) {
+			if (folderPath === "") continue; // Skip root folder - handle separately
+			
 			const previousCount = previousCounts.get(folderPath) || 0;
 			if (newCount !== previousCount) {
 				this.updateFolderCount(folderPath, newCount);
 			}
+		}
+		
+		// Handle root folder separately using rootOnlyCount
+		if (this.rootOnlyCount !== previousRootOnlyCount) {
+			this.updateFolderCount("", this.rootOnlyCount);
 		}
 		
 		// Also check for folders that were removed (count now 0 or undefined)
