@@ -6,14 +6,12 @@ import './styles.css';
 // Remember to rename these classes and interfaces!
 
 interface MyPluginSettings {
-	mySetting: string;
 	folderContainerWidth: number;
 	hiddenFolders: string[];
 	hiddenFiles: string[];
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default',
 	folderContainerWidth: 300,
 	hiddenFolders: [],
 	hiddenFiles: []
@@ -23,7 +21,6 @@ class FolderSuggestModal extends SuggestModal<TFolder> {
 	private plugin: MyPlugin;
 	private onSelect: (folder: TFolder) => void;
 	private suggestionCache: Map<string, TFolder[]> = new Map();
-	private debounceTimer: NodeJS.Timeout | null = null;
 
 	constructor(app: App, plugin: MyPlugin, onSelect: (folder: TFolder) => void) {
 		super(app);
@@ -76,7 +73,7 @@ class FolderSuggestModal extends SuggestModal<TFolder> {
 		}
 	}
 
-	onChooseSuggestion(folder: TFolder, evt: MouseEvent | KeyboardEvent) {
+	onChooseSuggestion(folder: TFolder) {
 		this.onSelect(folder);
 	}
 }
@@ -135,7 +132,7 @@ class FileSuggestModal extends SuggestModal<TFile> {
 		div.createDiv({ cls: 'file-suggestion-path', text: file.path });
 	}
 
-	onChooseSuggestion(file: TFile, evt: MouseEvent | KeyboardEvent) {
+	onChooseSuggestion(file: TFile) {
 		this.onSelect(file);
 	}
 }
@@ -168,7 +165,7 @@ export default class MyPlugin extends Plugin {
 		this.initializeNavigatorView();
 
 		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
+		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', () => {
 			// Called when the user clicks the icon.
 			new Notice('This is a notice!');
 		});
@@ -191,7 +188,7 @@ export default class MyPlugin extends Plugin {
 		this.addCommand({
 			id: 'sample-editor-command',
 			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
+			editorCallback: (editor: Editor) => {
 				console.log(editor.getSelection());
 				editor.replaceSelection('Sample Editor Command');
 			}
@@ -510,15 +507,5 @@ class SampleSettingTab extends PluginSettingTab {
 			emptyState.textContent = 'No hidden files yet. Use the button above to hide files.';
 		}
 
-		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
 	}
 }
