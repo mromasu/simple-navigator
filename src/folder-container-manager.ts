@@ -986,6 +986,11 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private getTargetGroup(file: TFile): string {
+		// Check if file is pinned first - pinned files always go to Pinned group
+		if (this.plugin.isPathPinned(file.path, 'file')) {
+			return 'Pinned';
+		}
+		
 		const fileDate = new Date(file.stat.ctime);
 		const now = new Date();
 		const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -1001,12 +1006,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			groupName = this.formatDateGroup(fileDate);
 		}
 		
-		console.log('[RENAME DEBUG] getTargetGroup', {
-			filePath: file.path,
-			ctime: file.stat.ctime,
-			fileDate: fileDate.toISOString(),
-			groupName
-		});
 		
 		return groupName;
 	}
