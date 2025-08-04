@@ -229,20 +229,20 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 }
 
 /* --- Unified highlighted (active) folder style for all types --- */
-.folder-item.folder-active .folder-header {
+.folder-item.folder-active > .folder-header {
     background-color: var(--interactive-accent);
     color: var(--text-on-accent);
 }
-.folder-item.folder-active .folder-header:hover {
+.folder-item.folder-active > .folder-header:hover {
     background-color: var(--interactive-accent-hover);
 }
-.folder-item.folder-active .folder-name,
-.folder-item.folder-active .folder-count,
-.folder-item.folder-active .folder-chevron,
-.folder-item.folder-active .folder-icon svg,
-.folder-item.folder-active .all-notes-icon,
-.folder-item.folder-active .all-notes-name,
-.folder-item.folder-active .all-notes-count {
+.folder-item.folder-active > .folder-header .folder-name,
+.folder-item.folder-active > .folder-header .folder-count,
+.folder-item.folder-active > .folder-header .folder-chevron,
+.folder-item.folder-active > .folder-header .folder-icon svg,
+.folder-item.folder-active > .folder-header .all-notes-icon,
+.folder-item.folder-active > .folder-header .all-notes-name,
+.folder-item.folder-active > .folder-header .all-notes-count {
     color: var(--text-on-accent) !important;
 }
 
@@ -534,4 +534,75 @@ button.folder-container-new-note {
 	.folder-chevron {
 		transition: color 0.1s ease;
 	}
+}
+
+/* Settings UI Styles */
+.hidden-items-list {
+	margin-top: 10px;
+	margin-bottom: 20px;
+}
+
+.hidden-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 6px 8px;
+	margin-bottom: 4px;
+	background: var(--background-secondary);
+	border-radius: 4px;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.hidden-item-path {
+	flex: 1;
+	font-size: 13px;
+	color: var(--text-normal);
+	font-family: var(--font-monospace);
+}
+
+.hidden-item-delete {
+	background: none;
+	border: none;
+	color: var(--text-muted);
+	cursor: pointer;
+	font-size: 16px;
+	font-weight: bold;
+	padding: 2px 6px;
+	border-radius: 2px;
+	transition: all 0.1s ease;
+}
+
+.hidden-item-delete:hover {
+	background: var(--background-modifier-error);
+	color: var(--text-error);
+}
+
+.setting-item h3 {
+	margin-top: 20px;
+	margin-bottom: 10px;
+	color: var(--text-normal);
+	font-weight: 600;
+}
+
+/* Suggestion Modal Styles */
+.folder-suggestion, .file-suggestion {
+	padding: 8px 12px;
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.folder-suggestion:hover, .file-suggestion:hover {
+	background: var(--background-modifier-hover);
+}
+
+.folder-suggestion-title, .file-suggestion-title {
+	font-weight: 600;
+	color: var(--text-normal);
+	margin-bottom: 2px;
+}
+
+.folder-suggestion-path, .file-suggestion-path {
+	font-size: 12px;
+	color: var(--text-muted);
+	font-family: var(--font-monospace);
 }

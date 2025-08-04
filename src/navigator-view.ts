@@ -184,10 +184,12 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		this.renderRootHeader(rootFolder, container);
 		
 		// Render root's subfolders directly at depth 0
-		const subfolders = rootFolder.children.filter(child => child instanceof TFolder) as TFolder[];
-		subfolders.sort((a, b) => a.name.localeCompare(b.name));
+		const subfolders = rootFolder.children
+			.filter(child => child instanceof TFolder) as TFolder[];
+		const visibleSubfolders = subfolders.filter(folder => !this.isHidden(folder.path));
+		visibleSubfolders.sort((a, b) => a.name.localeCompare(b.name));
 		
-		for (const subfolder of subfolders) {
+		for (const subfolder of visibleSubfolders) {
 			this.renderFolder(subfolder, container, 0);
 		}
 	}
@@ -325,9 +327,10 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			
 			// Always render children but control visibility with CSS classes
 			const subfolders = folder.children.filter(child => child instanceof TFolder) as TFolder[];
-			subfolders.sort((a, b) => a.name.localeCompare(b.name));
+			const visibleSubfolders = subfolders.filter(subfolder => !this.isHidden(subfolder.path));
+			visibleSubfolders.sort((a, b) => a.name.localeCompare(b.name));
 			
-			for (const subfolder of subfolders) {
+			for (const subfolder of visibleSubfolders) {
 				this.renderFolder(subfolder, childrenContainer, depth + 1);
 			}
 			
@@ -440,10 +443,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			// Render children if not already rendered
 			if (elements.children.children.length === 0) {
 				const subfolders = folder.children.filter(child => child instanceof TFolder) as TFolder[];
-				subfolders.sort((a, b) => a.name.localeCompare(b.name));
+				const visibleSubfolders = subfolders.filter(subfolder => !this.isHidden(subfolder.path));
+				visibleSubfolders.sort((a, b) => a.name.localeCompare(b.name));
 				
 				const depth = (elements.container.style.paddingLeft.replace('px', '') as any) / 16 + 1;
-				for (const subfolder of subfolders) {
+				for (const subfolder of visibleSubfolders) {
 					this.renderFolder(subfolder, elements.children, depth);
 				}
 			}
@@ -669,6 +673,15 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 
 		menu.addSeparator();
 
+		// Hide folder
+		menu.addItem((item) => {
+			item.setTitle('Hide folder')
+				.setIcon('eye-off')
+				.onClick(() => {
+					this.hideFolderPrompt(folder);
+				});
+		});
+
 		// Rename folder (only for non-root folders)
 		if (folder.path !== '') {
 			menu.addItem((item) => {
@@ -761,6 +774,28 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			console.error('Failed to delete folder:', error);
 			new Notice(`Failed to delete folder: ${error.message}`);
 		}
+	}
+
+	private async hideFolderPrompt(folder: TFolder): Promise<void> {
+		try {
+			// Add folder path to hidden folders
+			if (!this.plugin.settings.hiddenFolders.includes(folder.path)) {
+				this.plugin.settings.hiddenFolders.push(folder.path);
+				await this.plugin.saveSettings();
+				
+				// Refresh the view to hide the folder
+				this.refreshView();
+				
+				new Notice(`Folder "${folder.name}" hidden`);
+			}
+		} catch (error) {
+			console.error('Failed to hide folder:', error);
+			new Notice(`Failed to hide folder: ${error.message}`);
+		}
+	}
+
+	private isHidden(path: string): boolean {
+		return this.plugin.settings.hiddenFolders.includes(path);
 	}
 }
 

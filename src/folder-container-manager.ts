@@ -1,4 +1,4 @@
-import { App, TFolder, TFile, TAbstractFile, Vault, Menu } from 'obsidian';
+import { App, TFolder, TFile, TAbstractFile, Vault, Menu, Notice } from 'obsidian';
 import { VaultObserver, VaultUpdateHandler } from './vault-observer';
 import MyPlugin from './main';
 import { NavigatorView, TextInputModal } from './navigator-view';
@@ -258,8 +258,11 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			});
 		}
 
+		// Filter out hidden files
+		const visibleFiles = files.filter(file => !this.isFileHidden(file.path));
+
 		// Sort by creation time (newest first)
-		return files.sort((a, b) => b.stat.ctime - a.stat.ctime);
+		return visibleFiles.sort((a, b) => b.stat.ctime - a.stat.ctime);
 	}
 
 	private groupFilesByDate(files: TFile[]): Record<string, TFile[]> {
@@ -1355,6 +1358,15 @@ export class FolderContainerManager implements VaultUpdateHandler {
 				});
 		});
 
+		// Hide file
+		menu.addItem((item) => {
+			item.setTitle('Hide file')
+				.setIcon('eye-off')
+				.onClick(() => {
+					this.hideFilePrompt(file);
+				});
+		});
+
 		menu.addSeparator();
 
 		// Copy file path
@@ -1401,5 +1413,27 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		} catch (error) {
 			console.error('Failed to delete file:', error);
 		}
+	}
+
+	private async hideFilePrompt(file: TFile): Promise<void> {
+		try {
+			// Add file path to hidden files
+			if (!this.plugin.settings.hiddenFiles.includes(file.path)) {
+				this.plugin.settings.hiddenFiles.push(file.path);
+				await this.plugin.saveSettings();
+				
+				// Refresh the file list to hide the file
+				await this.refreshFileList();
+				
+				new Notice(`File "${file.basename}" hidden`);
+			}
+		} catch (error) {
+			console.error('Failed to hide file:', error);
+			new Notice(`Failed to hide file: ${error.message}`);
+		}
+	}
+
+	private isFileHidden(path: string): boolean {
+		return this.plugin.settings.hiddenFiles.includes(path);
 	}
 }
