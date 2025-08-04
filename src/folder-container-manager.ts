@@ -1417,9 +1417,9 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 	private async hideFilePrompt(file: TFile): Promise<void> {
 		try {
-			// Add file path to hidden files
-			if (!this.plugin.settings.hiddenFiles.includes(file.path)) {
-				this.plugin.settings.hiddenFiles.push(file.path);
+			// Add file path to hidden files using optimized method
+			if (!this.plugin.isPathHidden(file.path, 'file')) {
+				this.plugin.addHiddenPath(file.path, 'file');
 				await this.plugin.saveSettings();
 				
 				// Refresh the file list to hide the file
@@ -1434,6 +1434,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private isFileHidden(path: string): boolean {
-		return this.plugin.settings.hiddenFiles.includes(path);
+		return this.plugin.isPathHidden(path, 'file');
 	}
 }

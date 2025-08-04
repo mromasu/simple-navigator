@@ -778,9 +778,9 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 
 	private async hideFolderPrompt(folder: TFolder): Promise<void> {
 		try {
-			// Add folder path to hidden folders
-			if (!this.plugin.settings.hiddenFolders.includes(folder.path)) {
-				this.plugin.settings.hiddenFolders.push(folder.path);
+			// Add folder path to hidden folders using optimized method
+			if (!this.plugin.isPathHidden(folder.path, 'folder')) {
+				this.plugin.addHiddenPath(folder.path, 'folder');
 				await this.plugin.saveSettings();
 				
 				// Refresh the view to hide the folder
@@ -795,7 +795,7 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 	}
 
 	private isHidden(path: string): boolean {
-		return this.plugin.settings.hiddenFolders.includes(path);
+		return this.plugin.isPathHidden(path, 'folder');
 	}
 }
 

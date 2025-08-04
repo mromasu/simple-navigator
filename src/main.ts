@@ -22,6 +22,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 class FolderSuggestModal extends SuggestModal<TFolder> {
 	private plugin: MyPlugin;
 	private onSelect: (folder: TFolder) => void;
+	private suggestionCache: Map<string, TFolder[]> = new Map();
+	private debounceTimer: NodeJS.Timeout | null = null;
 
 	constructor(app: App, plugin: MyPlugin, onSelect: (folder: TFolder) => void) {
 		super(app);
@@ -31,30 +33,37 @@ class FolderSuggestModal extends SuggestModal<TFolder> {
 	}
 
 	getSuggestions(query: string): TFolder[] {
-		const folders: TFolder[] = [];
-		const rootFolder = this.app.vault.getRoot();
+		// Check cache first
+		const cacheKey = query.toLowerCase();
+		if (this.suggestionCache.has(cacheKey)) {
+			return this.suggestionCache.get(cacheKey)!;
+		}
 		
-		// Add root folder
-		folders.push(rootFolder);
+		// Use cached folders for better performance
+		const folders = this.plugin.getCachedFolders();
+		const queryLower = cacheKey; // Already lowercased
 		
-		// Get all folders recursively
-		const getAllFolders = (folder: TFolder) => {
-			for (const child of folder.children) {
-				if (child instanceof TFolder) {
-					folders.push(child);
-					getAllFolders(child);
-				}
+		// Filter with optimized lookups - limit to 50 results for performance
+		const results: TFolder[] = [];
+		for (const folder of folders) {
+			if (results.length >= 50) break; // Early termination
+			
+			const matchesQuery = query === '' || folder.path.toLowerCase().includes(queryLower);
+			const notAlreadyHidden = !this.plugin.isPathHidden(folder.path, 'folder');
+			
+			if (matchesQuery && notAlreadyHidden) {
+				results.push(folder);
 			}
-		};
+		}
 		
-		getAllFolders(rootFolder);
+		// Cache results (max 20 cached queries to prevent memory bloat)
+		if (this.suggestionCache.size >= 20) {
+			const firstKey = this.suggestionCache.keys().next().value;
+			this.suggestionCache.delete(firstKey);
+		}
+		this.suggestionCache.set(cacheKey, results);
 		
-		// Filter by query and exclude already hidden folders
-		return folders.filter(folder => {
-			const matchesQuery = query === '' || folder.path.toLowerCase().includes(query.toLowerCase());
-			const notAlreadyHidden = !this.plugin.settings.hiddenFolders.includes(folder.path);
-			return matchesQuery && notAlreadyHidden;
-		});
+		return results;
 	}
 
 	renderSuggestion(folder: TFolder, el: HTMLElement) {
@@ -75,6 +84,7 @@ class FolderSuggestModal extends SuggestModal<TFolder> {
 class FileSuggestModal extends SuggestModal<TFile> {
 	private plugin: MyPlugin;
 	private onSelect: (file: TFile) => void;
+	private suggestionCache: Map<string, TFile[]> = new Map();
 
 	constructor(app: App, plugin: MyPlugin, onSelect: (file: TFile) => void) {
 		super(app);
@@ -84,14 +94,39 @@ class FileSuggestModal extends SuggestModal<TFile> {
 	}
 
 	getSuggestions(query: string): TFile[] {
-		const files = this.app.vault.getFiles();
+		// Check cache first
+		const cacheKey = query.toLowerCase();
+		if (this.suggestionCache.has(cacheKey)) {
+			return this.suggestionCache.get(cacheKey)!;
+		}
 		
-		// Filter by query and exclude already hidden files
-		return files.filter(file => {
-			const matchesQuery = query === '' || file.path.toLowerCase().includes(query.toLowerCase()) || file.basename.toLowerCase().includes(query.toLowerCase());
-			const notAlreadyHidden = !this.plugin.settings.hiddenFiles.includes(file.path);
-			return matchesQuery && notAlreadyHidden;
-		});
+		// Use cached files for better performance
+		const files = this.plugin.getCachedFiles();
+		const queryLower = cacheKey; // Already lowercased
+		
+		// Filter with optimized lookups - limit to 50 results for performance
+		const results: TFile[] = [];
+		for (const file of files) {
+			if (results.length >= 50) break; // Early termination
+			
+			const matchesQuery = query === '' || 
+				file.path.toLowerCase().includes(queryLower) || 
+				file.basename.toLowerCase().includes(queryLower);
+			const notAlreadyHidden = !this.plugin.isPathHidden(file.path, 'file');
+			
+			if (matchesQuery && notAlreadyHidden) {
+				results.push(file);
+			}
+		}
+		
+		// Cache results (max 20 cached queries to prevent memory bloat)
+		if (this.suggestionCache.size >= 20) {
+			const firstKey = this.suggestionCache.keys().next().value;
+			this.suggestionCache.delete(firstKey);
+		}
+		this.suggestionCache.set(cacheKey, results);
+		
+		return results;
 	}
 
 	renderSuggestion(file: TFile, el: HTMLElement) {
@@ -107,6 +142,15 @@ class FileSuggestModal extends SuggestModal<TFile> {
 
 export default class MyPlugin extends Plugin {
 	settings: MyPluginSettings;
+	
+	// Performance optimization: Use Sets for O(1) lookups
+	private hiddenFoldersSet: Set<string> = new Set();
+	private hiddenFilesSet: Set<string> = new Set();
+	
+	// Caching for suggestion performance
+	private folderCache: TFolder[] | null = null;
+	private fileCache: TFile[] | null = null;
+	private cacheValidUntil: number = 0;
 
 	async onload() {
 		await this.loadSettings();
@@ -188,14 +232,117 @@ export default class MyPlugin extends Plugin {
 	onunload() {
 		// Clean up VaultObserver singleton
 		VaultObserver.cleanup();
+		
+		// Clear performance optimization caches and Sets
+		this.hiddenFoldersSet.clear();
+		this.hiddenFilesSet.clear();
+		this.folderCache = null;
+		this.fileCache = null;
+		this.cacheValidUntil = 0;
 	}
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		// Populate Sets for fast lookups
+		this.updateHiddenSets();
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		// Update Sets after saving
+		this.updateHiddenSets();
+		// Invalidate caches
+		this.invalidateCache();
+	}
+	
+	private updateHiddenSets(): void {
+		this.hiddenFoldersSet.clear();
+		this.hiddenFilesSet.clear();
+		
+		this.settings.hiddenFolders.forEach(path => this.hiddenFoldersSet.add(path));
+		this.settings.hiddenFiles.forEach(path => this.hiddenFilesSet.add(path));
+	}
+	
+	private invalidateCache(): void {
+		this.folderCache = null;
+		this.fileCache = null;
+		this.cacheValidUntil = 0;
+	}
+	
+	// Fast O(1) lookup methods
+	isPathHidden(path: string, type: 'folder' | 'file'): boolean {
+		return type === 'folder' ? this.hiddenFoldersSet.has(path) : this.hiddenFilesSet.has(path);
+	}
+	
+	// Add/remove items with Set updates
+	addHiddenPath(path: string, type: 'folder' | 'file'): void {
+		if (type === 'folder') {
+			if (!this.hiddenFoldersSet.has(path)) {
+				this.settings.hiddenFolders.push(path);
+				this.hiddenFoldersSet.add(path);
+			}
+		} else {
+			if (!this.hiddenFilesSet.has(path)) {
+				this.settings.hiddenFiles.push(path);
+				this.hiddenFilesSet.add(path);
+			}
+		}
+	}
+	
+	removeHiddenPath(path: string, type: 'folder' | 'file'): void {
+		if (type === 'folder') {
+			const index = this.settings.hiddenFolders.indexOf(path);
+			if (index > -1) {
+				this.settings.hiddenFolders.splice(index, 1);
+				this.hiddenFoldersSet.delete(path);
+			}
+		} else {
+			const index = this.settings.hiddenFiles.indexOf(path);
+			if (index > -1) {
+				this.settings.hiddenFiles.splice(index, 1);
+				this.hiddenFilesSet.delete(path);
+			}
+		}
+	}
+	
+	// Cached folder/file retrieval with TTL (1 second)
+	getCachedFolders(): TFolder[] {
+		const now = Date.now();
+		if (this.folderCache && now < this.cacheValidUntil) {
+			return this.folderCache;
+		}
+		
+		// Rebuild cache
+		const folders: TFolder[] = [];
+		const rootFolder = this.app.vault.getRoot();
+		folders.push(rootFolder);
+		
+		const getAllFolders = (folder: TFolder) => {
+			for (const child of folder.children) {
+				if (child instanceof TFolder) {
+					folders.push(child);
+					getAllFolders(child);
+				}
+			}
+		};
+		
+		getAllFolders(rootFolder);
+		
+		this.folderCache = folders;
+		this.cacheValidUntil = now + 1000; // 1 second TTL
+		return folders;
+	}
+	
+	getCachedFiles(): TFile[] {
+		const now = Date.now();
+		if (this.fileCache && now < this.cacheValidUntil) {
+			return this.fileCache;
+		}
+		
+		// Rebuild cache
+		this.fileCache = this.app.vault.getFiles();
+		this.cacheValidUntil = now + 1000; // 1 second TTL
+		return this.fileCache;
 	}
 
 	private async initializeNavigatorView(): Promise<void> {
@@ -251,7 +398,7 @@ class SampleSettingTab extends PluginSettingTab {
 				button.setButtonText('Choose folder to hide')
 					.onClick(() => {
 						const modal = new FolderSuggestModal(this.app, this.plugin, async (folder) => {
-							this.plugin.settings.hiddenFolders.push(folder.path);
+							this.plugin.addHiddenPath(folder.path, 'folder');
 							await this.plugin.saveSettings();
 							this.display(); // Refresh display
 							// Refresh navigator view
@@ -267,7 +414,7 @@ class SampleSettingTab extends PluginSettingTab {
 		// List of hidden folders
 		if (this.plugin.settings.hiddenFolders.length > 0) {
 			const folderListContainer = containerEl.createDiv('hidden-items-list');
-			this.plugin.settings.hiddenFolders.forEach((folderPath, index) => {
+			this.plugin.settings.hiddenFolders.forEach((folderPath) => {
 				const itemDiv = folderListContainer.createDiv('hidden-item');
 				itemDiv.createSpan('hidden-item-path').textContent = folderPath || 'Root';
 				
@@ -276,7 +423,7 @@ class SampleSettingTab extends PluginSettingTab {
 					text: '×'
 				});
 				deleteBtn.addEventListener('click', async () => {
-					this.plugin.settings.hiddenFolders.splice(index, 1);
+					this.plugin.removeHiddenPath(folderPath, 'folder');
 					await this.plugin.saveSettings();
 					this.display(); // Refresh display
 					// Refresh navigator view to show unhidden folder
@@ -299,7 +446,7 @@ class SampleSettingTab extends PluginSettingTab {
 				button.setButtonText('Choose file to hide')
 					.onClick(() => {
 						const modal = new FileSuggestModal(this.app, this.plugin, async (file) => {
-							this.plugin.settings.hiddenFiles.push(file.path);
+							this.plugin.addHiddenPath(file.path, 'file');
 							await this.plugin.saveSettings();
 							this.display(); // Refresh display
 						});
@@ -310,7 +457,7 @@ class SampleSettingTab extends PluginSettingTab {
 		// List of hidden files
 		if (this.plugin.settings.hiddenFiles.length > 0) {
 			const fileListContainer = containerEl.createDiv('hidden-items-list');
-			this.plugin.settings.hiddenFiles.forEach((filePath, index) => {
+			this.plugin.settings.hiddenFiles.forEach((filePath) => {
 				const itemDiv = fileListContainer.createDiv('hidden-item');
 				itemDiv.createSpan('hidden-item-path').textContent = filePath;
 				
@@ -319,7 +466,7 @@ class SampleSettingTab extends PluginSettingTab {
 					text: '×'
 				});
 				deleteBtn.addEventListener('click', async () => {
-					this.plugin.settings.hiddenFiles.splice(index, 1);
+					this.plugin.removeHiddenPath(filePath, 'file');
 					await this.plugin.saveSettings();
 					this.display(); // Refresh display
 				});
