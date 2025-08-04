@@ -416,12 +416,26 @@ class SampleSettingTab extends PluginSettingTab {
 			const folderListContainer = containerEl.createDiv('hidden-items-list');
 			this.plugin.settings.hiddenFolders.forEach((folderPath) => {
 				const itemDiv = folderListContainer.createDiv('hidden-item');
-				itemDiv.createSpan('hidden-item-path').textContent = folderPath || 'Root';
 				
-				const deleteBtn = itemDiv.createEl('button', {
+				// Content container
+				const contentDiv = itemDiv.createDiv('hidden-item-content');
+				
+				// Path display
+				const pathEl = contentDiv.createSpan('hidden-item-path');
+				pathEl.textContent = folderPath || 'Root';
+				pathEl.title = folderPath || 'Root folder'; // Tooltip for full path
+				
+				// Type indicator
+				const typeEl = contentDiv.createSpan('hidden-item-type');
+				typeEl.textContent = 'folder';
+				
+				// Actions container
+				const actionsDiv = itemDiv.createDiv('hidden-item-actions');
+				const deleteBtn = actionsDiv.createEl('button', {
 					cls: 'hidden-item-delete',
-					text: '×'
+					text: '✕'
 				});
+				deleteBtn.title = 'Remove from hidden folders';
 				deleteBtn.addEventListener('click', async () => {
 					this.plugin.removeHiddenPath(folderPath, 'folder');
 					await this.plugin.saveSettings();
@@ -433,6 +447,10 @@ class SampleSettingTab extends PluginSettingTab {
 					}
 				});
 			});
+		} else {
+			// Empty state for hidden folders
+			const emptyState = containerEl.createDiv('hidden-items-empty');
+			emptyState.textContent = 'No hidden folders yet. Use the button above to hide folders.';
 		}
 
 		// Hidden Files Section
@@ -459,18 +477,37 @@ class SampleSettingTab extends PluginSettingTab {
 			const fileListContainer = containerEl.createDiv('hidden-items-list');
 			this.plugin.settings.hiddenFiles.forEach((filePath) => {
 				const itemDiv = fileListContainer.createDiv('hidden-item');
-				itemDiv.createSpan('hidden-item-path').textContent = filePath;
 				
-				const deleteBtn = itemDiv.createEl('button', {
+				// Content container
+				const contentDiv = itemDiv.createDiv('hidden-item-content');
+				
+				// Path display - show just filename for better readability
+				const pathEl = contentDiv.createSpan('hidden-item-path');
+				const fileName = filePath.split('/').pop() || filePath;
+				pathEl.textContent = fileName;
+				pathEl.title = filePath; // Tooltip shows full path
+				
+				// Type indicator
+				const typeEl = contentDiv.createSpan('hidden-item-type');
+				typeEl.textContent = 'file';
+				
+				// Actions container
+				const actionsDiv = itemDiv.createDiv('hidden-item-actions');
+				const deleteBtn = actionsDiv.createEl('button', {
 					cls: 'hidden-item-delete',
-					text: '×'
+					text: '✕'
 				});
+				deleteBtn.title = 'Remove from hidden files';
 				deleteBtn.addEventListener('click', async () => {
 					this.plugin.removeHiddenPath(filePath, 'file');
 					await this.plugin.saveSettings();
 					this.display(); // Refresh display
 				});
 			});
+		} else {
+			// Empty state for hidden files
+			const emptyState = containerEl.createDiv('hidden-items-empty');
+			emptyState.textContent = 'No hidden files yet. Use the button above to hide files.';
 		}
 
 		new Setting(containerEl)
