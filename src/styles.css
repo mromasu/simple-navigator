@@ -13,10 +13,6 @@ If your plugin does not need CSS, delete this file.
 	font-weight: 600;
 }
 
-.file-item.pinned .file-item-title {
-	color: var(--interactive-accent);
-	font-weight: 700;
-}
 
 /* Pinned group styling */
 .file-list-group .file-list-group-header.pinned-header {
