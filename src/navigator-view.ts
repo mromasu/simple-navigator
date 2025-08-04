@@ -187,7 +187,16 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		const subfolders = rootFolder.children
 			.filter(child => child instanceof TFolder) as TFolder[];
 		const visibleSubfolders = subfolders.filter(folder => !this.isHidden(folder.path));
-		visibleSubfolders.sort((a, b) => a.name.localeCompare(b.name));
+		
+		// Sort with pinned folders first, then alphabetically within each group
+		visibleSubfolders.sort((a, b) => {
+			const aIsPinned = this.plugin.isPathPinned(a.path, 'folder');
+			const bIsPinned = this.plugin.isPathPinned(b.path, 'folder');
+			
+			if (aIsPinned && !bIsPinned) return -1;
+			if (!aIsPinned && bIsPinned) return 1;
+			return a.name.localeCompare(b.name);
+		});
 		
 		for (const subfolder of visibleSubfolders) {
 			this.renderFolder(subfolder, container, 0);
@@ -272,6 +281,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		folderEl.style.paddingLeft = `${depth * 16}px`;
 		folderEl.setAttribute('data-folder-path', folder.path);
 		
+		// Add pinned class if folder is pinned
+		if (this.plugin.isPathPinned(folder.path, 'folder')) {
+			folderEl.addClass('pinned');
+		}
+		
 		const folderHeader = folderEl.createEl('div', { cls: 'folder-header' });
 		
 		// Add click handler for folder header (not chevron)
@@ -328,7 +342,16 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 			// Always render children but control visibility with CSS classes
 			const subfolders = folder.children.filter(child => child instanceof TFolder) as TFolder[];
 			const visibleSubfolders = subfolders.filter(subfolder => !this.isHidden(subfolder.path));
-			visibleSubfolders.sort((a, b) => a.name.localeCompare(b.name));
+			
+			// Sort with pinned folders first, then alphabetically within each group
+			visibleSubfolders.sort((a, b) => {
+				const aIsPinned = this.plugin.isPathPinned(a.path, 'folder');
+				const bIsPinned = this.plugin.isPathPinned(b.path, 'folder');
+				
+				if (aIsPinned && !bIsPinned) return -1;
+				if (!aIsPinned && bIsPinned) return 1;
+				return a.name.localeCompare(b.name);
+			});
 			
 			for (const subfolder of visibleSubfolders) {
 				this.renderFolder(subfolder, childrenContainer, depth + 1);
@@ -672,6 +695,22 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		});
 
 		menu.addSeparator();
+
+		// Pin/Unpin folder
+		const isPinned = this.plugin.isPathPinned(folder.path, 'folder');
+		menu.addItem((item) => {
+			item.setTitle(isPinned ? 'Unpin folder' : 'Pin folder')
+				.setIcon(isPinned ? 'pin-off' : 'pin')
+				.onClick(async () => {
+					if (isPinned) {
+						this.plugin.removePinnedPath(folder.path, 'folder');
+					} else {
+						this.plugin.addPinnedPath(folder.path, 'folder');
+					}
+					await this.plugin.saveSettings();
+					this.refreshView();
+				});
+		});
 
 		// Hide folder
 		menu.addItem((item) => {

@@ -267,6 +267,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 	private groupFilesByDate(files: TFile[]): Record<string, TFile[]> {
 		const groups: Record<string, TFile[]> = {
+			'Pinned': [],
 			'Today': [],
 			'Yesterday': [],
 		};
@@ -276,6 +277,12 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
 
 		for (const file of files) {
+			// Check if file is pinned first
+			if (this.plugin.isPathPinned(file.path, 'file')) {
+				groups['Pinned'].push(file);
+				continue;
+			}
+
 			const fileDate = new Date(file.stat.ctime);
 			const fileDateOnly = new Date(fileDate.getFullYear(), fileDate.getMonth(), fileDate.getDate());
 
@@ -316,6 +323,9 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		// Group header
 		const header = group.createEl('h3', { cls: 'file-list-group-header' });
+		if (groupName === 'Pinned') {
+			header.addClass('pinned-header');
+		}
 		header.textContent = groupName;
 		
 		// Group container
@@ -341,6 +351,11 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 	private async renderFileItem(container: HTMLElement, file: TFile): Promise<void> {
 		const item = container.createEl('div', { cls: 'file-item' });
+		
+		// Add pinned class if file is pinned
+		if (this.plugin.isPathPinned(file.path, 'file')) {
+			item.addClass('pinned');
+		}
 		
 		// Item content (left side)
 		const itemContent = item.createEl('div', { cls: 'file-item-content' });
@@ -1338,6 +1353,22 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		});
 
 		menu.addSeparator();
+
+		// Pin/Unpin file
+		const isPinned = this.plugin.isPathPinned(file.path, 'file');
+		menu.addItem((item) => {
+			item.setTitle(isPinned ? 'Unpin file' : 'Pin file')
+				.setIcon(isPinned ? 'pin-off' : 'pin')
+				.onClick(async () => {
+					if (isPinned) {
+						this.plugin.removePinnedPath(file.path, 'file');
+					} else {
+						this.plugin.addPinnedPath(file.path, 'file');
+					}
+					await this.plugin.saveSettings();
+					await this.refreshFileList();
+				});
+		});
 
 		// Rename file
 		menu.addItem((item) => {

@@ -7,6 +7,51 @@ If your plugin does not need CSS, delete this file.
 
 */
 
+/* Pin indicator styling */
+.folder-item.pinned .folder-name {
+	color: var(--interactive-accent);
+	font-weight: 500;
+}
+
+.folder-item.pinned .folder-header::before {
+	content: "📌";
+	margin-right: 6px;
+	font-size: 11px;
+	opacity: 0.7;
+}
+
+.file-item.pinned .file-item-title {
+	color: var(--interactive-accent);
+	font-weight: 600;
+}
+
+.file-item.pinned::before {
+	content: "📌";
+	position: absolute;
+	top: 8px;
+	left: -2px;
+	font-size: 10px;
+	opacity: 0.7;
+	z-index: 1;
+}
+
+.file-item.pinned {
+	position: relative;
+}
+
+/* Pinned group styling */
+.file-list-group .file-list-group-header.pinned-header {
+	color: var(--interactive-accent);
+	position: relative;
+}
+
+.file-list-group .file-list-group-header.pinned-header::before {
+	content: "📌";
+	margin-right: 8px;
+	font-size: 14px;
+	opacity: 0.8;
+}
+
 .navigator-view {
 	display: flex;
 	flex-direction: column;

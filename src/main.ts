@@ -9,12 +9,16 @@ interface MyPluginSettings {
 	folderContainerWidth: number;
 	hiddenFolders: string[];
 	hiddenFiles: string[];
+	pinnedFolders: string[];
+	pinnedFiles: string[];
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
 	folderContainerWidth: 300,
 	hiddenFolders: [],
-	hiddenFiles: []
+	hiddenFiles: [],
+	pinnedFolders: [],
+	pinnedFiles: []
 }
 
 class FolderSuggestModal extends SuggestModal<TFolder> {
@@ -143,6 +147,8 @@ export default class MyPlugin extends Plugin {
 	// Performance optimization: Use Sets for O(1) lookups
 	private hiddenFoldersSet: Set<string> = new Set();
 	private hiddenFilesSet: Set<string> = new Set();
+	private pinnedFoldersSet: Set<string> = new Set();
+	private pinnedFilesSet: Set<string> = new Set();
 	
 	// Caching for suggestion performance
 	private folderCache: TFolder[] | null = null;
@@ -233,6 +239,8 @@ export default class MyPlugin extends Plugin {
 		// Clear performance optimization caches and Sets
 		this.hiddenFoldersSet.clear();
 		this.hiddenFilesSet.clear();
+		this.pinnedFoldersSet.clear();
+		this.pinnedFilesSet.clear();
 		this.folderCache = null;
 		this.fileCache = null;
 		this.cacheValidUntil = 0;
@@ -255,9 +263,13 @@ export default class MyPlugin extends Plugin {
 	private updateHiddenSets(): void {
 		this.hiddenFoldersSet.clear();
 		this.hiddenFilesSet.clear();
+		this.pinnedFoldersSet.clear();
+		this.pinnedFilesSet.clear();
 		
 		this.settings.hiddenFolders.forEach(path => this.hiddenFoldersSet.add(path));
 		this.settings.hiddenFiles.forEach(path => this.hiddenFilesSet.add(path));
+		this.settings.pinnedFolders.forEach(path => this.pinnedFoldersSet.add(path));
+		this.settings.pinnedFiles.forEach(path => this.pinnedFilesSet.add(path));
 	}
 	
 	private invalidateCache(): void {
@@ -269,6 +281,10 @@ export default class MyPlugin extends Plugin {
 	// Fast O(1) lookup methods
 	isPathHidden(path: string, type: 'folder' | 'file'): boolean {
 		return type === 'folder' ? this.hiddenFoldersSet.has(path) : this.hiddenFilesSet.has(path);
+	}
+	
+	isPathPinned(path: string, type: 'folder' | 'file'): boolean {
+		return type === 'folder' ? this.pinnedFoldersSet.has(path) : this.pinnedFilesSet.has(path);
 	}
 	
 	// Add/remove items with Set updates
@@ -298,6 +314,36 @@ export default class MyPlugin extends Plugin {
 			if (index > -1) {
 				this.settings.hiddenFiles.splice(index, 1);
 				this.hiddenFilesSet.delete(path);
+			}
+		}
+	}
+	
+	addPinnedPath(path: string, type: 'folder' | 'file'): void {
+		if (type === 'folder') {
+			if (!this.pinnedFoldersSet.has(path)) {
+				this.settings.pinnedFolders.push(path);
+				this.pinnedFoldersSet.add(path);
+			}
+		} else {
+			if (!this.pinnedFilesSet.has(path)) {
+				this.settings.pinnedFiles.push(path);
+				this.pinnedFilesSet.add(path);
+			}
+		}
+	}
+	
+	removePinnedPath(path: string, type: 'folder' | 'file'): void {
+		if (type === 'folder') {
+			const index = this.settings.pinnedFolders.indexOf(path);
+			if (index > -1) {
+				this.settings.pinnedFolders.splice(index, 1);
+				this.pinnedFoldersSet.delete(path);
+			}
+		} else {
+			const index = this.settings.pinnedFiles.indexOf(path);
+			if (index > -1) {
+				this.settings.pinnedFiles.splice(index, 1);
+				this.pinnedFilesSet.delete(path);
 			}
 		}
 	}
@@ -503,6 +549,126 @@ class SampleSettingTab extends PluginSettingTab {
 			// Empty state for hidden files
 			const emptyState = containerEl.createDiv('hidden-items-empty');
 			emptyState.textContent = 'No hidden files yet. Use the button above to hide files.';
+		}
+
+		// Pinned Items Section
+		containerEl.createEl('h3', {text: 'Pinned Items'});
+		
+		// Folder suggestion button for pinning
+		new Setting(containerEl)
+			.setName('Pin folder')
+			.setDesc('Search and select a folder to pin to the top of the navigator')
+			.addButton(button => {
+				button.setButtonText('Choose folder to pin')
+					.onClick(() => {
+						const modal = new FolderSuggestModal(this.app, this.plugin, async (folder) => {
+							this.plugin.addPinnedPath(folder.path, 'folder');
+							await this.plugin.saveSettings();
+							this.display(); // Refresh display
+							// Refresh navigator view
+							const navigatorView = this.app.workspace.getLeavesOfType('navigator-view')[0]?.view;
+							if (navigatorView) {
+								(navigatorView as any).refreshView();
+							}
+						});
+						modal.open();
+					});
+			});
+
+		// List of pinned folders
+		if (this.plugin.settings.pinnedFolders.length > 0) {
+			const folderListContainer = containerEl.createDiv('hidden-items-list');
+			this.plugin.settings.pinnedFolders.forEach((folderPath) => {
+				const itemDiv = folderListContainer.createDiv('hidden-item');
+				
+				// Content container
+				const contentDiv = itemDiv.createDiv('hidden-item-content');
+				
+				// Path display
+				const pathEl = contentDiv.createSpan('hidden-item-path');
+				pathEl.textContent = folderPath || 'Root';
+				pathEl.title = folderPath || 'Root folder'; // Tooltip for full path
+				
+				// Type indicator
+				const typeEl = contentDiv.createSpan('hidden-item-type');
+				typeEl.textContent = 'folder';
+				
+				// Actions container
+				const actionsDiv = itemDiv.createDiv('hidden-item-actions');
+				const deleteBtn = actionsDiv.createEl('button', {
+					cls: 'hidden-item-delete',
+					text: '✕'
+				});
+				deleteBtn.title = 'Remove from pinned folders';
+				deleteBtn.addEventListener('click', async () => {
+					this.plugin.removePinnedPath(folderPath, 'folder');
+					await this.plugin.saveSettings();
+					this.display(); // Refresh display
+					// Refresh navigator view to show unpinned folder
+					const navigatorView = this.app.workspace.getLeavesOfType('navigator-view')[0]?.view;
+					if (navigatorView) {
+						(navigatorView as any).refreshView();
+					}
+				});
+			});
+		} else {
+			// Empty state for pinned folders
+			const emptyState = containerEl.createDiv('hidden-items-empty');
+			emptyState.textContent = 'No pinned folders yet. Use the button above to pin folders.';
+		}
+
+		// File suggestion button for pinning
+		new Setting(containerEl)
+			.setName('Pin file')
+			.setDesc('Search and select a file to pin to the top of file lists')
+			.addButton(button => {
+				button.setButtonText('Choose file to pin')
+					.onClick(() => {
+						const modal = new FileSuggestModal(this.app, this.plugin, async (file) => {
+							this.plugin.addPinnedPath(file.path, 'file');
+							await this.plugin.saveSettings();
+							this.display(); // Refresh display
+						});
+						modal.open();
+					});
+			});
+
+		// List of pinned files
+		if (this.plugin.settings.pinnedFiles.length > 0) {
+			const fileListContainer = containerEl.createDiv('hidden-items-list');
+			this.plugin.settings.pinnedFiles.forEach((filePath) => {
+				const itemDiv = fileListContainer.createDiv('hidden-item');
+				
+				// Content container
+				const contentDiv = itemDiv.createDiv('hidden-item-content');
+				
+				// Path display - show just filename for better readability
+				const pathEl = contentDiv.createSpan('hidden-item-path');
+				const fileName = filePath.split('/').pop() || filePath;
+				pathEl.textContent = fileName;
+				pathEl.title = filePath; // Tooltip shows full path
+				
+				// Type indicator
+				const typeEl = contentDiv.createSpan('hidden-item-type');
+				typeEl.textContent = 'file';
+				
+				// Actions container
+				const actionsDiv = itemDiv.createDiv('hidden-item-actions');
+				const deleteBtn = actionsDiv.createEl('button', {
+					cls: 'hidden-item-delete',
+					text: '✕'
+				});
+				deleteBtn.title = 'Remove from pinned files';
+				deleteBtn.addEventListener('click', async () => {
+					this.plugin.removePinnedPath(filePath, 'file');
+					await this.plugin.saveSettings();
+					this.display(); // Refresh display
+				});
+			});
+		} else {
+			// Empty state for pinned files
+			const emptyState = containerEl.createDiv('hidden-items-empty');
+			emptyState.textContent = 'No pinned files yet. Use the button above to pin files.';
 		}
 
 	}
