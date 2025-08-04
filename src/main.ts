@@ -384,8 +384,8 @@ class SampleSettingTab extends PluginSettingTab {
 
 		containerEl.empty();
 
-		// Hidden Folders Section
-		containerEl.createEl('h3', {text: 'Hidden Folders'});
+		// Hidden Items Section
+		containerEl.createEl('h3', {text: 'Hidden Items'});
 		
 		// Folder suggestion button
 		new Setting(containerEl)
@@ -450,8 +450,6 @@ class SampleSettingTab extends PluginSettingTab {
 			emptyState.textContent = 'No hidden folders yet. Use the button above to hide folders.';
 		}
 
-		// Hidden Files Section
-		containerEl.createEl('h3', {text: 'Hidden Files'});
 		
 		// File suggestion button
 		new Setting(containerEl)
