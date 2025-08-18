@@ -715,6 +715,14 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private isFileInCurrentFolder(file: TAbstractFile): boolean {
 		if (!this.currentFolder) return false;
 		
+		console.log('[DELETE DEBUG] isFileInCurrentFolder check', {
+			filePath: file.path,
+			currentFolderPath: this.currentFolder.path,
+			fileParent: file.parent?.path || 'null',
+			isAllNotesMode: this.isAllNotesMode,
+			isRootFolder: this.currentFolder.isRoot()
+		});
+		
 		if (this.isAllNotesMode) {
 			// For All Notes mode: all files in vault are relevant
 			return true;
@@ -723,13 +731,22 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			return true;
 		} else {
 			// For specific folder: check if file is in this folder or its children
+			// For deleted files, we need to check by path since parent might be null
+			if (file.path.startsWith(this.currentFolder.path + '/')) {
+				console.log('[DELETE DEBUG] File is in current folder (by path check)');
+				return true;
+			}
+			
+			// Fallback to parent traversal for non-deleted files
 			let current = file.parent;
 			while (current) {
 				if (current === this.currentFolder) {
+					console.log('[DELETE DEBUG] File is in current folder (by parent traversal)');
 					return true;
 				}
 				current = current.parent;
 			}
+			console.log('[DELETE DEBUG] File is NOT in current folder');
 			return false;
 		}
 	}
