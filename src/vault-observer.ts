@@ -63,6 +63,12 @@ export class VaultObserver {
 
 		this.eventRefs.push(
 			this.app.vault.on('delete', (file) => {
+				console.log('[DELETE DEBUG] vault.on(delete) triggered', {
+					filePath: file.path,
+					fileName: file instanceof TFile ? file.basename : file.name,
+					isFile: file instanceof TFile,
+					registeredViews: this.views.size
+				});
 				this.queueChange({
 					type: 'delete',
 					file,

@@ -892,15 +892,22 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private removeFileItem(file: TFile): void {
-		console.log('[RENAME DEBUG] removeFileItem START', { filePath: file.path });
+		console.log('[DELETE DEBUG] removeFileItem START', { 
+			filePath: file.path,
+			fileElementsSize: this.fileElements.size,
+			hasElements: this.fileElements.has(file.path)
+		});
 		
 		const elements = this.fileElements.get(file.path);
 		if (!elements) {
-			console.log('[RENAME DEBUG] removeFileItem - no elements found');
+			console.log('[DELETE DEBUG] removeFileItem - no elements found for file', {
+				filePath: file.path,
+				availableKeys: Array.from(this.fileElements.keys())
+			});
 			return;
 		}
 		
-		console.log('[RENAME DEBUG] removeFileItem - found elements, removing');
+		console.log('[DELETE DEBUG] removeFileItem - found elements, removing DOM and maps');
 		
 		// Remove the divider after this item (if exists)
 		const nextSibling = elements.container.nextSibling;
@@ -921,9 +928,13 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		// Check if group is now empty and remove if needed
 		const groupName = this.getTargetGroup(file);
+		console.log('[DELETE DEBUG] removeFileItem - checking for empty group', { groupName });
 		this.removeEmptyGroup(groupName);
 		
-		console.log('[RENAME DEBUG] removeFileItem END');
+		console.log('[DELETE DEBUG] removeFileItem END - successful removal', {
+			filePath: file.path,
+			remainingFilesCount: this.fileElements.size
+		});
 	}
 
 	private async moveFileItem(file: TFile, oldGroupName: string, newGroupName: string): Promise<void> {
@@ -1066,14 +1077,35 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	handleFileDelete(file: TAbstractFile, affectedFolders: string[]): void {
-		if (!this.container || !this.currentFolder) return;
+		console.log('[DELETE DEBUG] handleFileDelete START', {
+			filePath: file.path,
+			fileName: file instanceof TFile ? file.basename : file.name,
+			container: !!this.container,
+			currentFolder: this.currentFolder?.path,
+			affectedFolders,
+			fileInCurrentFolder: this.isFileInCurrentFolder(file),
+			fileInElements: file instanceof TFile && this.fileElements.has(file.path)
+		});
+
+		if (!this.container || !this.currentFolder) {
+			console.log('[DELETE DEBUG] Early return - no container or folder');
+			return;
+		}
 		
 		// Only handle files that were in the current folder or its children
-		if (!this.isFileInCurrentFolder(file)) return;
+		if (!this.isFileInCurrentFolder(file)) {
+			console.log('[DELETE DEBUG] Early return - file not in current folder');
+			return;
+		}
 		
 		if (file instanceof TFile) {
+			console.log('[DELETE DEBUG] Processing file deletion');
 			this.removeFileItem(file);
+		} else {
+			console.log('[DELETE DEBUG] Not a TFile, skipping');
 		}
+
+		console.log('[DELETE DEBUG] handleFileDelete END');
 	}
 
 	handleFileRename(file: TAbstractFile, oldPath: string, affectedFolders: string[]): void {
