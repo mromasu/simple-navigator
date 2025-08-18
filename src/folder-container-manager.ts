@@ -114,11 +114,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Create header
 		const header = this.container.createEl('div', { cls: 'folder-container-header' });
 		
-		// Create new note button (left side)
-		const newNoteButton = header.createEl('button', { cls: 'folder-container-new-note' });
-		newNoteButton.innerHTML = '+';
-		newNoteButton.title = 'Create new note';
-		newNoteButton.addEventListener('click', () => this.createNewNote());
+		// Create close button (left side)
+		const closeButton = header.createEl('button', { cls: 'folder-container-close' });
+		closeButton.innerHTML = '×';
+		closeButton.addEventListener('click', () => this.closeContainer());
 		
 		// Create title (center)
 		const title = header.createEl('h2', { cls: 'folder-container-title' });
@@ -129,10 +128,11 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			title.textContent = this.currentFolder.isRoot() ? 'Notes' : this.currentFolder.name;
 		}
 
-		// Create close button (right side)
-		const closeButton = header.createEl('button', { cls: 'folder-container-close' });
-		closeButton.innerHTML = '×';
-		closeButton.addEventListener('click', () => this.closeContainer());
+		// Create new note button (right side)
+		const newNoteButton = header.createEl('button', { cls: 'folder-container-new-note' });
+		newNoteButton.innerHTML = '+';
+		newNoteButton.title = 'Create new note';
+		newNoteButton.addEventListener('click', () => this.createNewNote());
 
 		// Create content container
 		const content = this.container.createEl('div', { cls: 'folder-container-content' });
