@@ -442,6 +442,8 @@ export default class MyPlugin extends Plugin {
 			if (this.app.workspace.leftSplit) {
 				this.debugLog('Left sidebar found, expanding');
 				this.app.workspace.leftSplit.expand();
+				// After left sidebar is expanded, expand the extend-sidebar too
+				this.expandExtendSidebar();
 				return true;
 			}
 			this.debugLog('Left sidebar not yet available');
@@ -464,6 +466,29 @@ export default class MyPlugin extends Plugin {
 				}, 500);
 			}
 		});
+	}
+
+	private async expandExtendSidebar(): Promise<void> {
+		this.debugLog('Attempting to expand extend-sidebar');
+		
+		// Small delay to ensure left sidebar is fully expanded first
+		setTimeout(async () => {
+			const navigatorView = this.getNavigatorView();
+			if (navigatorView && navigatorView.hasContainer()) {
+				// Check if container is collapsed and expand it
+				const containerManager = (navigatorView as any).containerManager;
+				if (containerManager && containerManager.isCollapsed) {
+					this.debugLog('Extend-sidebar is collapsed, expanding it');
+					await navigatorView.toggleContainerCollapse();
+				} else {
+					this.debugLog('Extend-sidebar is already expanded or not collapsed');
+				}
+			} else {
+				this.debugLog('Navigator view or container not available yet, retrying...');
+				// Retry after a longer delay if container isn't ready
+				setTimeout(() => this.expandExtendSidebar(), 1000);
+			}
+		}, 200);
 	}
 
 	private getNavigatorView(): NavigatorView | null {
