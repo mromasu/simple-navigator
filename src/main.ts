@@ -12,6 +12,7 @@ interface MyPluginSettings {
 	hiddenFiles: string[];
 	pinnedFolders: string[];
 	pinnedFiles: string[];
+	debugLogging: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -20,7 +21,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	hiddenFolders: [],
 	hiddenFiles: [],
 	pinnedFolders: [],
-	pinnedFiles: []
+	pinnedFiles: [],
+	debugLogging: false
 }
 
 class FolderSuggestModal extends SuggestModal<TFolder> {
@@ -244,6 +246,21 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 
+		// Add command to manually retry container initialization
+		this.addCommand({
+			id: 'retry-container-initialization',
+			name: 'Retry folder container initialization',
+			callback: () => {
+				this.debugLog('Manual retry container initialization requested');
+				const navigatorView = this.getNavigatorView();
+				if (navigatorView) {
+					navigatorView.retryContainerInitialization();
+				} else {
+					this.debugLog('Navigator view not found for manual retry');
+				}
+			}
+		});
+
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
@@ -426,16 +443,44 @@ export default class MyPlugin extends Plugin {
 	}
 
 	private async initializeFolderContainer(): Promise<void> {
-		// Wait for workspace to be ready
-		this.app.workspace.onLayoutReady(() => {
-			// Get the navigator view
-			const navigatorLeaf = this.app.workspace.getLeavesOfType(NAVIGATOR_VIEW_TYPE)[0];
-			if (navigatorLeaf && navigatorLeaf.view instanceof NavigatorView) {
-				const navigatorView = navigatorLeaf.view as NavigatorView;
-				// Initialize container with All Notes view
+		this.debugLog('Starting folder container initialization');
+		
+		// Multiple initialization approaches for better reliability
+		const initializeWithRetry = async () => {
+			this.debugLog('Attempting container initialization');
+			const navigatorView = this.getNavigatorView();
+			if (navigatorView) {
+				this.debugLog('Navigator view found, initializing container');
 				navigatorView.initializeContainer();
+				return true;
+			} else {
+				this.debugLog('Navigator view not found');
+				return false;
+			}
+		};
+
+		// Primary: Wait for layout ready
+		this.app.workspace.onLayoutReady(async () => {
+			this.debugLog('Layout ready event triggered');
+			const success = await initializeWithRetry();
+			if (!success) {
+				this.debugLog('Layout ready initialization failed, setting up retry');
+				// Retry after a short delay
+				setTimeout(() => initializeWithRetry(), 1000);
 			}
 		});
+
+		// Secondary: Listen for sidebar state changes
+		this.registerEvent(
+			this.app.workspace.on('layout-change', async () => {
+				this.debugLog('Layout change detected');
+				const navigatorView = this.getNavigatorView();
+				if (navigatorView && !navigatorView.hasContainer()) {
+					this.debugLog('Container missing after layout change, retrying initialization');
+					setTimeout(() => initializeWithRetry(), 500);
+				}
+			})
+		);
 	}
 
 	private getNavigatorView(): NavigatorView | null {
@@ -444,6 +489,12 @@ export default class MyPlugin extends Plugin {
 			return navigatorLeaf.view as NavigatorView;
 		}
 		return null;
+	}
+
+	debugLog(message: string, ...args: any[]): void {
+		if (this.settings.debugLogging) {
+			console.log(`[Simple Navigator Debug] ${message}`, ...args);
+		}
 	}
 }
 
@@ -716,6 +767,20 @@ class SampleSettingTab extends PluginSettingTab {
 			const emptyState = containerEl.createDiv('hidden-items-empty');
 			emptyState.textContent = 'No pinned files yet. Use the button above to pin files.';
 		}
+
+		// Debug Logging Section
+		containerEl.createEl('h3', {text: 'Debug Settings'});
+		
+		new Setting(containerEl)
+			.setName('Enable debug logging')
+			.setDesc('Enable detailed debug logging in the browser console. Helpful for troubleshooting initialization issues.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.debugLogging)
+					.onChange(async (value) => {
+						this.plugin.settings.debugLogging = value;
+						await this.plugin.saveSettings();
+					});
+			});
 
 	}
 }

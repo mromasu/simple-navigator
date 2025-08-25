@@ -33,6 +33,9 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private groupElements: Map<string, GroupElements> = new Map();
 	private isAllNotesMode: boolean = false;
 	private isCollapsed: boolean = false;
+	private retryCount: number = 0;
+	private maxRetries: number = 5;
+	private baseRetryDelay: number = 1000; // 1 second
 
 	constructor(app: App, plugin: MyPlugin, navigatorView: NavigatorView) {
 		this.app = app;
@@ -43,6 +46,83 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 	private bindEvents(): void {
 		// Only close button closes the container - no ESC key
+	}
+
+	private debugLog(message: string, ...args: any[]): void {
+		if (this.plugin.settings.debugLogging) {
+			console.log(`[Simple Navigator - Container] ${message}`, ...args);
+		}
+	}
+
+	private getSidebarState(): { leftOpen: boolean; rightOpen: boolean } {
+		// Detect sidebar states by checking CSS classes and DOM elements
+		const appContainer = document.querySelector('.app-container');
+		const leftSidebar = document.querySelector('.mod-left-split');
+		const rightSidebar = document.querySelector('.mod-right-split');
+		
+		const leftOpen = leftSidebar ? !leftSidebar.hasClass('is-collapsed') : false;
+		const rightOpen = rightSidebar ? !rightSidebar.hasClass('is-collapsed') : false;
+		
+		this.debugLog('Sidebar states:', { leftOpen, rightOpen });
+		return { leftOpen, rightOpen };
+	}
+
+	private logDOMStructure(): void {
+		if (!this.plugin.settings.debugLogging) return;
+		
+		this.debugLog('=== DOM Structure Analysis ===');
+		
+		// Log app container structure
+		const appContainer = document.querySelector('.app-container');
+		if (appContainer) {
+			this.debugLog('App container found:', appContainer.className);
+			this.debugLog('App container children:', Array.from(appContainer.children).map((el, i) => `${i}: ${el.className}`));
+		}
+		
+		// Log sidebar states
+		const sidebarState = this.getSidebarState();
+		this.debugLog('Sidebar states:', sidebarState);
+		
+		// Log horizontal main container
+		const horizontalMain = document.querySelector('.horizontal-main-container');
+		if (horizontalMain) {
+			this.debugLog('Horizontal main container:', horizontalMain.className);
+			this.debugLog('Horizontal main children:', Array.from(horizontalMain.children).map((el, i) => `${i}: ${el.className}`));
+		}
+		
+		this.debugLog('=== End DOM Structure Analysis ===');
+	}
+
+	private findWorkspaceElement(): HTMLElement | null {
+		// Log DOM structure and sidebar states for debugging
+		this.logDOMStructure();
+		
+		// Multiple fallback selectors for workspace element detection
+		// Order matters - more specific selectors first
+		const selectors = [
+			'.app-container .horizontal-main-container .workspace',
+			'.horizontal-main-container .workspace',
+			'.app-container .workspace',
+			'.workspace',
+			'[data-type="workspace"]',
+			'.workspace-split.mod-root'
+		];
+
+		this.debugLog('Searching for workspace element with selectors:', selectors);
+		
+		for (const selector of selectors) {
+			const element = document.querySelector(selector) as HTMLElement;
+			if (element) {
+				this.debugLog(`Found workspace element with selector: ${selector}`);
+				this.debugLog('Workspace element classes:', element.className);
+				this.debugLog('Workspace element children count:', element.children.length);
+				return element;
+			}
+		}
+
+		// If we still can't find workspace, try waiting for DOM to be ready
+		this.debugLog('No workspace element found with standard selectors');
+		return null;
 	}
 
 	openContainer(folder: TFolder): void;
@@ -85,10 +165,24 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 	// Method to initialize container on plugin load
 	initializeContainer(): void {
+		this.debugLog('FolderContainerManager.initializeContainer called');
 		if (!this.container) {
 			// Initialize with All Notes by default
 			this.openContainer('ALL_NOTES');
 		}
+	}
+
+	// Method to retry initialization (public for manual retry)
+	retryInitialization(): void {
+		this.debugLog('Manual retry initialization requested');
+		this.retryCount = 0; // Reset retry count for manual retry
+		this.closeContainer();
+		this.initializeContainer();
+	}
+
+	// Check if container exists
+	hasContainer(): boolean {
+		return this.container !== null;
 	}
 
 	closeContainer(): void {
@@ -141,12 +235,37 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	}
 
 	private async createContainer(): Promise<void> {
-		if (!this.currentFolder) return;
+		if (!this.currentFolder) {
+			this.debugLog('createContainer called but currentFolder is null');
+			return;
+		}
 
-		// Find the workspace element
-		const workspace = document.querySelector('.app-container .horizontal-main-container .workspace');
-		if (!workspace) return;
+		this.debugLog(`Creating container for ${this.isAllNotesMode ? 'ALL_NOTES' : this.currentFolder.path}, retry count: ${this.retryCount}`);
+		
+		// Find the workspace element with fallback selectors
+		const workspace = this.findWorkspaceElement();
+		if (!workspace) {
+			this.debugLog('Workspace element not found');
+			
+			// Implement retry logic with exponential backoff
+			if (this.retryCount < this.maxRetries) {
+				this.retryCount++;
+				const delay = this.baseRetryDelay * Math.pow(2, this.retryCount - 1);
+				this.debugLog(`Retrying container creation in ${delay}ms (attempt ${this.retryCount}/${this.maxRetries})`);
+				
+				setTimeout(() => {
+					this.createContainer();
+				}, delay);
+			} else {
+				this.debugLog('Max retries exceeded, container creation failed');
+				console.error('[Simple Navigator] Failed to find workspace element after maximum retries. Container will not be created.');
+			}
+			return;
+		}
 
+		this.debugLog('Workspace element found, proceeding with container creation');
+		this.retryCount = 0; // Reset retry count on successful workspace detection
+		
 		// Create container element
 		this.container = document.createElement('div');
 		this.container.addClass('workspace-split', 'mod-horizontal', 'mod-sidedock', 'mod-left-extend');
@@ -197,11 +316,20 @@ export class FolderContainerManager implements VaultUpdateHandler {
 
 		// Insert as 3rd child in workspace
 		const children = Array.from(workspace.children);
+		this.debugLog(`Workspace has ${children.length} children:`, children.map(el => el.className));
+		
 		if (children.length >= 2) {
+			this.debugLog('Inserting container as 3rd child');
 			workspace.insertBefore(this.container, children[2] || null);
 		} else {
+			this.debugLog('Appending container to workspace');
 			workspace.appendChild(this.container);
 		}
+		
+		this.debugLog('Container successfully created and inserted into DOM');
+		this.debugLog('Container classes:', this.container.className);
+		this.debugLog('Container width:', this.container.offsetWidth);
+		this.debugLog('Container is collapsed:', this.isCollapsed);
 	}
 
 	private setupResizeHandle(): void {
