@@ -496,8 +496,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		if (this.isAllNotesMode || !this.currentFolder?.isRoot()) {
 			meta = itemContent.createEl('div', { cls: 'file-item-meta' });
 			
-			// Folder badge (if not in root)
-			if (!file.parent?.isRoot()) {
+			// Folder badge (if not in root and not in current folder for folder views)
+			const shouldShowFolderBadge = !file.parent?.isRoot() && 
+				(this.isAllNotesMode || file.parent !== this.currentFolder);
+			if (shouldShowFolderBadge) {
 				folderBadge = meta.createEl('span', { cls: 'file-item-folder' });
 				folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 			}
@@ -997,7 +999,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			elements.folderBadge = undefined;
 		}
 
-		if ((this.isAllNotesMode || !this.currentFolder?.isRoot()) && elements.meta && !file.parent?.isRoot()) {
+		const shouldShowFolderBadge = (this.isAllNotesMode || !this.currentFolder?.isRoot()) && 
+			elements.meta && !file.parent?.isRoot() && 
+			(this.isAllNotesMode || file.parent !== this.currentFolder);
+		if (shouldShowFolderBadge && elements.meta) {
 			const folderBadge = elements.meta.createEl('span', { cls: 'file-item-folder' });
 			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 			elements.folderBadge = folderBadge;
