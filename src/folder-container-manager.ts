@@ -215,7 +215,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Update button text and tooltip
 		const collapseButton = this.container.querySelector('.folder-container-close') as HTMLElement;
 		if (collapseButton) {
-			collapseButton.innerHTML = this.isCollapsed ? '▶' : '◀'; // Right arrow when collapsed, left when expanded
+			collapseButton.innerHTML = '×'; // Close icon
 			collapseButton.title = this.isCollapsed ? 'Expand' : 'Collapse';
 		}
 		
