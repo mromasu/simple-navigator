@@ -174,10 +174,8 @@ export default class MyPlugin extends Plugin {
 		// Open navigator view in left sidebar if not already present
 		this.initializeNavigatorView();
 
-		// Open left sidebar on plugin load with null handling
-		if (this.app.workspace.leftSplit) {
-			this.app.workspace.leftSplit.expand();
-		}
+		// Open left sidebar on plugin load - wait for it to be available
+		this.ensureLeftSidebarExpanded();
 
 		// Initialize mod-left-extend container on load
 		this.initializeFolderContainer();
@@ -437,6 +435,35 @@ export default class MyPlugin extends Plugin {
 				}
 			})
 		);
+	}
+
+	private async ensureLeftSidebarExpanded(): Promise<void> {
+		const expandSidebar = () => {
+			if (this.app.workspace.leftSplit) {
+				this.debugLog('Left sidebar found, expanding');
+				this.app.workspace.leftSplit.expand();
+				return true;
+			}
+			this.debugLog('Left sidebar not yet available');
+			return false;
+		};
+
+		// Try immediately first
+		if (expandSidebar()) {
+			return;
+		}
+
+		// Wait for layout ready
+		this.app.workspace.onLayoutReady(() => {
+			this.debugLog('Layout ready, attempting to expand left sidebar');
+			if (!expandSidebar()) {
+				// Retry with a short delay if still not available
+				setTimeout(() => {
+					this.debugLog('Retrying left sidebar expansion after delay');
+					expandSidebar();
+				}, 500);
+			}
+		});
 	}
 
 	private getNavigatorView(): NavigatorView | null {
