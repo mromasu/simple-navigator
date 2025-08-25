@@ -285,7 +285,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		
 		// Create collapse button (left side)
 		const collapseButton = header.createEl('button', { cls: 'folder-container-close' });
-		collapseButton.innerHTML = '◀'; // Left arrow
+		collapseButton.innerHTML = '×'; // Close icon
 		collapseButton.title = this.isCollapsed ? 'Expand' : 'Collapse';
 		collapseButton.addEventListener('click', () => this.toggleCollapse());
 		
