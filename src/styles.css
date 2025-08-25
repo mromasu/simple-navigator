@@ -308,13 +308,6 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	text-overflow: ellipsis;
 }
 
-.mod-left-extend
-button.folder-container-close:before {
-	font-family: Inter, sans-serif;
-	content: '\D7';
-	font-weight: 300;
-}
-
 .folder-container-close:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
