@@ -13,6 +13,7 @@ interface MyPluginSettings {
 	pinnedFolders: string[];
 	pinnedFiles: string[];
 	debugLogging: boolean;
+	openSidebarsOnLoad: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -22,7 +23,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	hiddenFiles: [],
 	pinnedFolders: [],
 	pinnedFiles: [],
-	debugLogging: false
+	debugLogging: false,
+	openSidebarsOnLoad: true
 }
 
 class FolderSuggestModal extends SuggestModal<TFolder> {
@@ -174,8 +176,10 @@ export default class MyPlugin extends Plugin {
 		// Open navigator view in left sidebar if not already present
 		this.initializeNavigatorView();
 
-		// Open left sidebar on plugin load - wait for it to be available
-		this.ensureLeftSidebarExpanded();
+		// Auto-open sidebars if setting is enabled
+		if (this.settings.openSidebarsOnLoad) {
+			this.ensureLeftSidebarExpanded();
+		}
 
 		// Initialize mod-left-extend container on load
 		this.initializeFolderContainer();
@@ -775,6 +779,20 @@ class SampleSettingTab extends PluginSettingTab {
 			const emptyState = containerEl.createDiv('hidden-items-empty');
 			emptyState.textContent = 'No pinned files yet. Use the button above to pin files.';
 		}
+
+		// Startup Behavior Section
+		containerEl.createEl('h3', {text: 'Startup Behavior'});
+		
+		new Setting(containerEl)
+			.setName('Auto-open sidebars on startup')
+			.setDesc('Automatically open the left sidebar and folder container when the plugin loads or Obsidian starts up.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.openSidebarsOnLoad)
+					.onChange(async (value) => {
+						this.plugin.settings.openSidebarsOnLoad = value;
+						await this.plugin.saveSettings();
+					});
+			});
 
 		// Debug Logging Section
 		containerEl.createEl('h3', {text: 'Debug Settings'});
