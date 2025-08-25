@@ -107,6 +107,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		this.containerManager.initializeContainer();
 	}
 
+	async toggleContainerCollapse(): Promise<void> {
+		// Toggle collapse state of the folder container
+		await this.containerManager.toggleCollapse();
+	}
+
 	async onOpen(): Promise<void> {
 		const container = this.containerEl.children[1];
 		container.empty();

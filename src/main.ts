@@ -224,6 +224,26 @@ export default class MyPlugin extends Plugin {
 			}
 		});
 
+		// Add command to toggle folder container collapse
+		this.addCommand({
+			id: 'toggle-folder-container-collapse',
+			name: 'Toggle folder container collapse',
+			checkCallback: (checking: boolean) => {
+				// Check if navigator view exists and has container
+				const navigatorView = this.getNavigatorView();
+				if (navigatorView) {
+					// If checking is true, we're simply "checking" if the command can be run
+					// If checking is false, then we want to actually perform the operation
+					if (!checking) {
+						navigatorView.toggleContainerCollapse();
+					}
+					// This command will only show up in Command Palette when navigator view is available
+					return true;
+				}
+				return false;
+			}
+		});
+
 		// This adds a settings tab so the user can configure various aspects of the plugin
 		this.addSettingTab(new SampleSettingTab(this.app, this));
 
@@ -416,6 +436,14 @@ export default class MyPlugin extends Plugin {
 				navigatorView.initializeContainer();
 			}
 		});
+	}
+
+	private getNavigatorView(): NavigatorView | null {
+		const navigatorLeaf = this.app.workspace.getLeavesOfType(NAVIGATOR_VIEW_TYPE)[0];
+		if (navigatorLeaf && navigatorLeaf.view instanceof NavigatorView) {
+			return navigatorLeaf.view as NavigatorView;
+		}
+		return null;
 	}
 }
 
