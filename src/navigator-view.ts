@@ -102,6 +102,11 @@ export class NavigatorView extends ItemView implements VaultUpdateHandler {
 		return 'navigation';
 	}
 
+	initializeContainer(): void {
+		// Initialize the folder container with All Notes
+		this.containerManager.initializeContainer();
+	}
+
 	async onOpen(): Promise<void> {
 		const container = this.containerEl.children[1];
 		container.empty();

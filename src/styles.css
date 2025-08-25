@@ -270,6 +270,19 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	z-index: 10;
 	display: flex;
 	flex-direction: column;
+	transition: width 0.3s ease;
+}
+
+/* Collapsed state */
+.workspace-split.mod-horizontal.mod-sidedock.mod-left-extend.collapsed {
+	width: 0;
+	border-right: none;
+	overflow: hidden;
+}
+
+/* Expanded state (explicit for clarity) */
+.workspace-split.mod-horizontal.mod-sidedock.mod-left-extend.expanded {
+	width: var(--folder-container-width, 300px);
 }
 
 .mod-left-extend
@@ -545,6 +558,11 @@ button.folder-container-new-note {
 .workspace-split.mod-horizontal.mod-sidedock.mod-left-extend .resize-handle:hover {
 	background: var(--interactive-accent);
 	opacity: 1;
+}
+
+/* Hide resize handle when collapsed */
+.workspace-split.mod-horizontal.mod-sidedock.mod-left-extend.collapsed .resize-handle {
+	display: none;
 }
 
 /* Motion sensitivity support */

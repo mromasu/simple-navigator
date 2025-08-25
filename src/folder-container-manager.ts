@@ -32,6 +32,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private fileElements: Map<string, FileItemElements> = new Map();
 	private groupElements: Map<string, GroupElements> = new Map();
 	private isAllNotesMode: boolean = false;
+	private isCollapsed: boolean = false;
 
 	constructor(app: App, plugin: MyPlugin, navigatorView: NavigatorView) {
 		this.app = app;
@@ -49,6 +50,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	openContainer(target: TFolder | 'ALL_NOTES'): void {
 		// If container already exists, just update it instead of recreating
 		if (this.container) {
+			// Expand container if it's collapsed when user clicks a folder
+			if (this.isCollapsed) {
+				this.toggleCollapse();
+			}
 			// Use setTimeout to avoid blocking the UI
 			setTimeout(async () => {
 				await this.updateContainer(target);
@@ -78,6 +83,14 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		VaultObserver.getInstance(this.app).registerView(this);
 	}
 
+	// Method to initialize container on plugin load
+	initializeContainer(): void {
+		if (!this.container) {
+			// Initialize with All Notes by default
+			this.openContainer('ALL_NOTES');
+		}
+	}
+
 	closeContainer(): void {
 		if (this.container) {
 			// Unregister from VaultObserver
@@ -91,12 +104,40 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			this.currentFolder = null;
 			this.resizeHandle = null;
 			this.isAllNotesMode = false;
+			this.isCollapsed = false;
 			
 			// Clear element tracking
 			this.fileElements.clear();
 			this.groupElements.clear();
 			this.fileImageCache.clear();
 		}
+	}
+
+	async toggleCollapse(): Promise<void> {
+		if (!this.container) return;
+		
+		this.isCollapsed = !this.isCollapsed;
+		
+		// Update button text and tooltip
+		const collapseButton = this.container.querySelector('.folder-container-close') as HTMLElement;
+		if (collapseButton) {
+			collapseButton.innerHTML = this.isCollapsed ? '▶' : '◀'; // Right arrow when collapsed, left when expanded
+			collapseButton.title = this.isCollapsed ? 'Expand' : 'Collapse';
+		}
+		
+		// Update CSS classes for animation
+		if (this.isCollapsed) {
+			this.container.removeClass('expanded');
+			this.container.addClass('collapsed');
+		} else {
+			this.container.removeClass('collapsed');
+			this.container.addClass('expanded');
+			this.container.style.setProperty('--folder-container-width', `${this.plugin.settings.folderContainerWidth}px`);
+		}
+		
+		// Save state to settings
+		this.plugin.settings.folderContainerCollapsed = this.isCollapsed;
+		await this.plugin.saveSettings();
 	}
 
 	private async createContainer(): Promise<void> {
@@ -109,15 +150,25 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Create container element
 		this.container = document.createElement('div');
 		this.container.addClass('workspace-split', 'mod-horizontal', 'mod-sidedock', 'mod-left-extend');
-		this.container.style.width = `${this.plugin.settings.folderContainerWidth}px`;
+		
+		// Initialize collapsed state from settings
+		this.isCollapsed = this.plugin.settings.folderContainerCollapsed;
+		
+		if (this.isCollapsed) {
+			this.container.addClass('collapsed');
+		} else {
+			this.container.addClass('expanded');
+			this.container.style.setProperty('--folder-container-width', `${this.plugin.settings.folderContainerWidth}px`);
+		}
 
 		// Create header
 		const header = this.container.createEl('div', { cls: 'folder-container-header' });
 		
-		// Create close button (left side)
-		const closeButton = header.createEl('button', { cls: 'folder-container-close' });
-		closeButton.innerHTML = '×';
-		closeButton.addEventListener('click', () => this.closeContainer());
+		// Create collapse button (left side)
+		const collapseButton = header.createEl('button', { cls: 'folder-container-close' });
+		collapseButton.innerHTML = '◀'; // Left arrow
+		collapseButton.title = this.isCollapsed ? 'Expand' : 'Collapse';
+		collapseButton.addEventListener('click', () => this.toggleCollapse());
 		
 		// Create title (center)
 		const title = header.createEl('h2', { cls: 'folder-container-title' });

@@ -7,6 +7,7 @@ import './styles.css';
 
 interface MyPluginSettings {
 	folderContainerWidth: number;
+	folderContainerCollapsed: boolean;
 	hiddenFolders: string[];
 	hiddenFiles: string[];
 	pinnedFolders: string[];
@@ -15,6 +16,7 @@ interface MyPluginSettings {
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
 	folderContainerWidth: 300,
+	folderContainerCollapsed: false,
 	hiddenFolders: [],
 	hiddenFiles: [],
 	pinnedFolders: [],
@@ -169,6 +171,9 @@ export default class MyPlugin extends Plugin {
 
 		// Open navigator view in left sidebar if not already present
 		this.initializeNavigatorView();
+
+		// Initialize mod-left-extend container on load
+		this.initializeFolderContainer();
 
 		// This creates an icon in the left ribbon.
 		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', () => {
@@ -398,6 +403,19 @@ export default class MyPlugin extends Plugin {
 				await leaf.setViewState({ type: NAVIGATOR_VIEW_TYPE, active: false });
 			}
 		}
+	}
+
+	private async initializeFolderContainer(): Promise<void> {
+		// Wait for workspace to be ready
+		this.app.workspace.onLayoutReady(() => {
+			// Get the navigator view
+			const navigatorLeaf = this.app.workspace.getLeavesOfType(NAVIGATOR_VIEW_TYPE)[0];
+			if (navigatorLeaf && navigatorLeaf.view instanceof NavigatorView) {
+				const navigatorView = navigatorLeaf.view as NavigatorView;
+				// Initialize container with All Notes view
+				navigatorView.initializeContainer();
+			}
+		});
 	}
 }
 
