@@ -436,7 +436,10 @@ button.folder-container-new-note {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	color:var(--text-accent);
+	color: var(--text-accent);
+	max-width: 120px;
+	display: inline-block;
+	vertical-align: top;
 }
 
 

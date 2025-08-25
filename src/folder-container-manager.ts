@@ -441,6 +441,42 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 	}
 
+	private generateBreadcrumbPath(file: TFile): string {
+		if (!file.parent || file.parent.isRoot()) {
+			return 'Notes';
+		}
+
+		const pathParts: string[] = [];
+		let currentFolder: TFolder | null = file.parent;
+		
+		// Collect all folder names from file's parent up to root or current viewed folder
+		while (currentFolder && !currentFolder.isRoot()) {
+			// Stop if we reach the current viewed folder (don't include it in breadcrumb)
+			if (!this.isAllNotesMode && this.currentFolder && currentFolder === this.currentFolder) {
+				break;
+			}
+			pathParts.unshift(currentFolder.name);
+			currentFolder = currentFolder.parent;
+		}
+
+		if (pathParts.length === 0) {
+			return 'Notes';
+		}
+
+		// Truncate all but the last folder name to fit ~5px width (approximately 2-3 characters)
+		const truncatedParts = pathParts.map((part, index) => {
+			if (index === pathParts.length - 1) {
+				// Last part (current folder) - no truncation limit
+				return part;
+			} else {
+				// Parent folders - truncate to 3 characters max
+				return part.length > 3 ? part.substring(0, 3) : part;
+			}
+		});
+
+		return truncatedParts.join('/');
+	}
+
 	private async renderFileGroup(content: HTMLElement, groupName: string, files: TFile[]): Promise<void> {
 		const group = content.createEl('div', { cls: 'file-list-group' });
 		
@@ -502,7 +538,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		if (shouldShowFolderBadge) {
 			meta = itemContent.createEl('div', { cls: 'file-item-meta' });
 			folderBadge = meta.createEl('span', { cls: 'file-item-folder' });
-			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
+			const breadcrumbPath = this.generateBreadcrumbPath(file);
+			folderBadge.innerHTML = `📁 ${breadcrumbPath}`;
 		}
 		
 		// Image container (right side)
@@ -1009,7 +1046,8 @@ export class FolderContainerManager implements VaultUpdateHandler {
 				elements.meta = elements.content.createEl('div', { cls: 'file-item-meta' });
 			}
 			const folderBadge = elements.meta.createEl('span', { cls: 'file-item-folder' });
-			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
+			const breadcrumbPath = this.generateBreadcrumbPath(file);
+			folderBadge.innerHTML = `📁 ${breadcrumbPath}`;
 			elements.folderBadge = folderBadge;
 		} else if (elements.meta) {
 			// Remove empty meta element if no content
