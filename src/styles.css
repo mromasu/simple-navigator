@@ -309,16 +309,10 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 }
 
 .mod-left-extend
-button.folder-container-close {
-	background: none;
-	border: none;
-	font-size: 20px;
-	color: var(--text-muted);
-	cursor: pointer;
-	padding: 4px 8px;
-	border-radius: 4px;
-	transition: background-color 0.1s ease, color 0.1s ease;
-	box-shadow: none;
+button.folder-container-close:before {
+	font-family: Inter, sans-serif;
+	content: '\D7';
+	font-weight: 300;
 }
 
 .folder-container-close:hover {
