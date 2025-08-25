@@ -490,10 +490,10 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// File preview
 		const preview = itemContent.createEl('div', { cls: 'file-item-preview' });
 		
-		// Item metadata (only show if in All Notes mode)
+		// Item metadata (show if in All Notes mode or in specific folder with subfolders)
 		let meta: HTMLElement | undefined;
 		let folderBadge: HTMLElement | undefined;
-		if (this.isAllNotesMode) {
+		if (this.isAllNotesMode || !this.currentFolder?.isRoot()) {
 			meta = itemContent.createEl('div', { cls: 'file-item-meta' });
 			
 			// Folder badge (if not in root)
@@ -997,7 +997,7 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			elements.folderBadge = undefined;
 		}
 
-		if (this.isAllNotesMode && elements.meta && !file.parent?.isRoot()) {
+		if ((this.isAllNotesMode || !this.currentFolder?.isRoot()) && elements.meta && !file.parent?.isRoot()) {
 			const folderBadge = elements.meta.createEl('span', { cls: 'file-item-folder' });
 			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 			elements.folderBadge = folderBadge;
