@@ -599,8 +599,41 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		await this.setImagePreviewWithRetry(element, file, imagePath);
 	}
 
+	private isValidImageUrl(url: string): boolean {
+		const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff', '.ico'];
+		const urlLower = url.toLowerCase();
+		return imageExtensions.some(ext => urlLower.endsWith(ext));
+	}
+
+	private extractFrontmatterImage(content: string): string | null {
+		const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---/);
+		if (!frontmatterMatch) return null;
+		
+		const frontmatterContent = frontmatterMatch[1];
+		const frontmatterFields = ['cover', 'banner', 'thumbnail', 'featured-image', 'image', 'preview'];
+		
+		for (const field of frontmatterFields) {
+			const fieldRegex = new RegExp(`^${field}:\\s*(.+)$`, 'm');
+			const match = frontmatterContent.match(fieldRegex);
+			if (match) {
+				const imageUrl = match[1].trim().replace(/['"]/g, '');
+				if (this.isValidImageUrl(imageUrl)) {
+					return imageUrl;
+				}
+			}
+		}
+		
+		return null;
+	}
+
 	private extractFirstImage(content: string): string | null {
-		// Remove YAML frontmatter first
+		// First check for frontmatter images
+		const frontmatterImage = this.extractFrontmatterImage(content);
+		if (frontmatterImage) {
+			return frontmatterImage;
+		}
+
+		// Remove YAML frontmatter for content search
 		const withoutFrontmatter = content.replace(/^---[\s\S]*?---\n?/m, '');
 		
 		// Pattern for Markdown images: ![alt](path)

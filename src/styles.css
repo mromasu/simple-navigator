@@ -290,6 +290,9 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	font-weight: 600;
 	color: var(--text-normal);
 	margin: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .mod-left-extend
@@ -391,6 +394,9 @@ button.folder-container-new-note {
 	color: var(--text-normal);
 	margin-bottom: 2px;
 	line-height: 1.3;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .file-item-preview {
