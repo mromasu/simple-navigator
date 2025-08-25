@@ -443,6 +443,7 @@ button.folder-container-new-note {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	color:var(--text-accent);
 }
 
 
