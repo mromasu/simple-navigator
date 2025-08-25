@@ -454,8 +454,8 @@ button.folder-container-new-note {
 	transition: width 0.2s ease, height 0.2s ease;
 }
 
-/* When meta exists (detected via :has()), make image larger to use available space */
-.file-item:has(.file-item-meta) .file-item-image {
+/* When meta exists and has content (detected via :has()), make image larger to use available space */
+.file-item:has(.file-item-meta:not(:empty)) .file-item-image {
 	width: 64px;
 	height: 64px;
 }

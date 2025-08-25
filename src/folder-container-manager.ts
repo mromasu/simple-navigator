@@ -490,19 +490,19 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// File preview
 		const preview = itemContent.createEl('div', { cls: 'file-item-preview' });
 		
-		// Item metadata (show if in All Notes mode or in specific folder with subfolders)
+		// Item metadata (only create when there's content to show)
 		let meta: HTMLElement | undefined;
 		let folderBadge: HTMLElement | undefined;
-		if (this.isAllNotesMode || !this.currentFolder?.isRoot()) {
+		
+		// Folder badge (if not in root and not in current folder for folder views)
+		const shouldShowFolderBadge = (this.isAllNotesMode || !this.currentFolder?.isRoot()) &&
+			!file.parent?.isRoot() && 
+			(this.isAllNotesMode || file.parent !== this.currentFolder);
+		
+		if (shouldShowFolderBadge) {
 			meta = itemContent.createEl('div', { cls: 'file-item-meta' });
-			
-			// Folder badge (if not in root and not in current folder for folder views)
-			const shouldShowFolderBadge = !file.parent?.isRoot() && 
-				(this.isAllNotesMode || file.parent !== this.currentFolder);
-			if (shouldShowFolderBadge) {
-				folderBadge = meta.createEl('span', { cls: 'file-item-folder' });
-				folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
-			}
+			folderBadge = meta.createEl('span', { cls: 'file-item-folder' });
+			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 		}
 		
 		// Image container (right side)
@@ -1000,12 +1000,21 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		}
 
 		const shouldShowFolderBadge = (this.isAllNotesMode || !this.currentFolder?.isRoot()) && 
-			elements.meta && !file.parent?.isRoot() && 
+			!file.parent?.isRoot() && 
 			(this.isAllNotesMode || file.parent !== this.currentFolder);
-		if (shouldShowFolderBadge && elements.meta) {
+		
+		if (shouldShowFolderBadge) {
+			// Create meta if it doesn't exist
+			if (!elements.meta) {
+				elements.meta = elements.content.createEl('div', { cls: 'file-item-meta' });
+			}
 			const folderBadge = elements.meta.createEl('span', { cls: 'file-item-folder' });
 			folderBadge.innerHTML = `📁 ${file.parent?.name || 'Notes'}`;
 			elements.folderBadge = folderBadge;
+		} else if (elements.meta) {
+			// Remove empty meta element if no content
+			elements.meta.remove();
+			elements.meta = undefined;
 		}
 		
 		// Update folder attribute
