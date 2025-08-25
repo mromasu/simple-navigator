@@ -308,6 +308,12 @@ button:not(.clickable-icon).navigator-create-folder-btn:hover {
 	text-overflow: ellipsis;
 }
 
+button.folder-container-close:not(.clickable-icon){
+	box-shadow: none;
+	font-size: 18px;
+	padding-inline: 8px;
+}
+
 .folder-container-close:hover {
 	background-color: var(--background-modifier-hover);
 	color: var(--text-normal);
@@ -521,37 +527,6 @@ button.folder-container-new-note {
 	margin: 0;
 }
 
-.workspace-split.mod-horizontal.mod-sidedock.mod-left-extend .resize-handle {
-    position: absolute;
-    right: -2.5px;
-    top: unset;
-    bottom: 0;
-    width: calc(1px + var(--divider-width-hover));
-    height: var(--divider-vertical-height);
-    cursor: col-resize;
-    background-color: transparent;
-    z-index: var(--layer-cover);
-    border-inline-end-style: solid;
-    border-inline-end-width: var(--divider-width);
-    border-color: var(--divider-color);
-    border-top: 0;
-    border-width: var(--divider-width);
-    margin: 0;
-    transition: background-color .2s ease-in-out,border-color .2s ease-in-out,opacity .2s ease-in-out;
-    transition: opacity .0s;
-	-webkit-app-region: no-drag;
-	opacity: 0;
-}
-
-.workspace-split.mod-horizontal.mod-sidedock.mod-left-extend .resize-handle:hover {
-	background: var(--interactive-accent);
-	opacity: 1;
-}
-
-/* Hide resize handle when collapsed */
-.workspace-split.mod-horizontal.mod-sidedock.mod-left-extend.collapsed .resize-handle {
-	display: none;
-}
 
 /* Motion sensitivity support */
 @media (prefers-reduced-motion: reduce) {

@@ -25,10 +25,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 	private navigatorView: NavigatorView;
 	private container: HTMLElement | null = null;
 	private currentFolder: TFolder | null = null;
-	private resizeHandle: HTMLElement | null = null;
-	private isDragging = false;
-	private dragStartX = 0;
-	private dragStartWidth = 0;
 	private fileElements: Map<string, FileItemElements> = new Map();
 	private groupElements: Map<string, GroupElements> = new Map();
 	private isAllNotesMode: boolean = false;
@@ -196,7 +192,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			this.container.remove();
 			this.container = null;
 			this.currentFolder = null;
-			this.resizeHandle = null;
 			this.isAllNotesMode = false;
 			this.isCollapsed = false;
 			
@@ -226,7 +221,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		} else {
 			this.container.removeClass('collapsed');
 			this.container.addClass('expanded');
-			this.container.style.setProperty('--folder-container-width', `${this.plugin.settings.folderContainerWidth}px`);
 		}
 		
 		// Save state to settings
@@ -277,7 +271,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 			this.container.addClass('collapsed');
 		} else {
 			this.container.addClass('expanded');
-			this.container.style.setProperty('--folder-container-width', `${this.plugin.settings.folderContainerWidth}px`);
 		}
 
 		// Create header
@@ -310,9 +303,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		// Render file list
 		await this.renderFileList(content);
 
-		// Create resize handle
-		this.resizeHandle = this.container.createEl('div', { cls: 'resize-handle' });
-		this.setupResizeHandle();
 
 		// Insert as 3rd child in workspace
 		const children = Array.from(workspace.children);
@@ -332,52 +322,6 @@ export class FolderContainerManager implements VaultUpdateHandler {
 		this.debugLog('Container is collapsed:', this.isCollapsed);
 	}
 
-	private setupResizeHandle(): void {
-		if (!this.resizeHandle || !this.container) return;
-
-		this.resizeHandle.addEventListener('mousedown', (e) => {
-			e.preventDefault();
-			this.startResize(e);
-		});
-	}
-
-	private startResize(e: MouseEvent): void {
-		if (!this.container) return;
-
-		this.isDragging = true;
-		this.dragStartX = e.clientX;
-		this.dragStartWidth = this.container.offsetWidth;
-
-		document.addEventListener('mousemove', this.handleResize);
-		document.addEventListener('mouseup', this.stopResize);
-		document.body.style.cursor = 'col-resize';
-		document.body.style.userSelect = 'none';
-	}
-
-	private handleResize = (e: MouseEvent): void => {
-		if (!this.isDragging || !this.container) return;
-
-		const deltaX = e.clientX - this.dragStartX;
-		const newWidth = Math.max(200, Math.min(600, this.dragStartWidth + deltaX));
-		
-		this.container.style.width = `${newWidth}px`;
-	};
-
-	private stopResize = async (): Promise<void> => {
-		if (!this.isDragging || !this.container) return;
-
-		this.isDragging = false;
-		const finalWidth = this.container.offsetWidth;
-
-		// Save width to settings
-		this.plugin.settings.folderContainerWidth = finalWidth;
-		await this.plugin.saveSettings();
-
-		document.removeEventListener('mousemove', this.handleResize);
-		document.removeEventListener('mouseup', this.stopResize);
-		document.body.style.cursor = '';
-		document.body.style.userSelect = '';
-	};
 
 	cleanup(): void {
 		// Unregister from VaultObserver before closing
