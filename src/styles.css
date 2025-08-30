@@ -706,7 +706,7 @@ button.folder-container-new-note {
 	min-height: 60px;
 }
 
-.mobile-nav-back-btn {
+button.mobile-nav-back-btn:not(.clickable-icon) {
 	background: none;
 	border: none;
 	font-size: 16px;
@@ -730,7 +730,7 @@ button.folder-container-new-note {
 	color: var(--text-normal);
 }
 
-.mobile-nav-action-btn {
+button.mobile-nav-action-btn:not(.clickable-icon) {
 	background: var(--interactive-accent);
 	border: none;
 	color: var(--text-on-accent);
@@ -880,7 +880,7 @@ button.folder-container-new-note {
 .mobile-file-group-container {
 	background: var(--background-secondary);
 	border: 1px solid var(--background-modifier-border);
-	border-radius: 12px;
+	border-radius: 8px;
 	overflow: hidden;
 }
 
@@ -888,7 +888,7 @@ button.folder-container-new-note {
 	display: flex;
 	align-items: flex-start;
 	gap: 16px;
-	padding: 16px;
+	padding: 10px 16px;
 	cursor: pointer;
 	transition: background-color 0.1s ease;
 }
@@ -912,9 +912,9 @@ button.folder-container-new-note {
 	color: var(--text-normal);
 	margin-bottom: 4px;
 	line-height: 1.3;
-	white-space: nowrap;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
 	overflow: hidden;
-	text-overflow: ellipsis;
 }
 
 .mobile-file-preview {
@@ -1015,29 +1015,7 @@ button.folder-container-new-note {
 	margin: 0;
 }
 
-/* Special styling for All Notes and Root items */
-.mobile-folder-item.all-notes-item .mobile-folder-header,
-.mobile-folder-item.root-item .mobile-folder-header {
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-	border: none;
-}
-
-.mobile-folder-item.all-notes-item .mobile-folder-header:hover,
-.mobile-folder-item.root-item .mobile-folder-header:hover {
-	background-color: var(--interactive-accent-hover);
-}
-
-.mobile-folder-item.all-notes-item .mobile-folder-name,
-.mobile-folder-item.all-notes-item .mobile-folder-count,
-.mobile-folder-item.all-notes-item .mobile-folder-chevron,
-.mobile-folder-item.all-notes-item .mobile-folder-icon,
-.mobile-folder-item.root-item .mobile-folder-name,
-.mobile-folder-item.root-item .mobile-folder-count,
-.mobile-folder-item.root-item .mobile-folder-chevron,
-.mobile-folder-item.root-item .mobile-folder-icon {
-	color: var(--text-on-accent) !important;
-}
+/* All folder items use same grey background */
 
 /* Responsive adjustments for mobile */
 @media (max-width: 768px) {
@@ -1053,10 +1031,6 @@ button.folder-container-new-note {
 	.mobile-folder-header {
 		padding: 16px;
 		min-height: 56px;
-	}
-	
-	.mobile-file-item {
-		padding: 20px 16px;
 	}
 	
 	.mobile-file-image {

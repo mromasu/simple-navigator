@@ -76,7 +76,8 @@ export class MobileNavigatorView extends FileView implements VaultUpdateHandler 
 		container.empty();
 		container.addClass('mobile-navigator-view');
 		
-		this.renderView();
+		// Open All Notes file view by default
+		this.switchToFileView('ALL_NOTES');
 		
 		// Register with VaultObserver
 		VaultObserver.getInstance(this.app).registerView(this);
