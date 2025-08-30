@@ -714,6 +714,7 @@ button.mobile-nav-back-btn:not(.clickable-icon) {
 	color: var(--interactive-accent);
 	cursor: pointer;
 	padding: 8px 12px;
+	padding-left: 0px;
 	border-radius: 6px;
 	transition: background-color 0.1s ease;
 }
@@ -754,6 +755,14 @@ button.mobile-nav-action-btn:not(.clickable-icon) {
 	flex: 1;
 	overflow-y: auto;
 	padding: 16px;
+}
+
+.mobile-nav-content-title {
+	font-size: 20px;
+	font-weight: 600;
+	color: var(--text-normal);
+	margin: 0 0 16px 0;
+	padding: 0;
 }
 
 /* Mobile Folder View */
@@ -1033,6 +1042,7 @@ button.mobile-nav-action-btn:not(.clickable-icon) {
 		min-height: 56px;
 	}
 	
+
 	.mobile-file-image {
 		width: 64px;
 		height: 64px;
