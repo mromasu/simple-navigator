@@ -1,5 +1,6 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, SuggestModal, TFile, TFolder } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, SuggestModal, TFile, TFolder, Platform } from 'obsidian';
 import { NavigatorView, NAVIGATOR_VIEW_TYPE } from './navigator-view';
+import { MobileNavigatorView, MOBILE_NAVIGATOR_VIEW_TYPE } from './mobile-navigator-view';
 import { VaultObserver } from './vault-observer';
 import './styles.css';
 
@@ -14,6 +15,7 @@ interface MyPluginSettings {
 	pinnedFiles: string[];
 	debugLogging: boolean;
 	openSidebarsOnLoad: boolean;
+	enableMobileView: boolean;
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -24,7 +26,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	pinnedFolders: [],
 	pinnedFiles: [],
 	debugLogging: false,
-	openSidebarsOnLoad: true
+	openSidebarsOnLoad: true,
+	enableMobileView: true
 }
 
 class FolderSuggestModal extends SuggestModal<TFolder> {
@@ -173,6 +176,12 @@ export default class MyPlugin extends Plugin {
 			(leaf) => new NavigatorView(leaf, this)
 		);
 
+		// Register the mobile navigator view
+		this.registerView(
+			MOBILE_NAVIGATOR_VIEW_TYPE,
+			(leaf) => new MobileNavigatorView(leaf, this)
+		);
+
 		// Open navigator view in left sidebar if not already present
 		this.initializeNavigatorView();
 
@@ -183,6 +192,9 @@ export default class MyPlugin extends Plugin {
 
 		// Initialize mod-left-extend container on load
 		this.initializeFolderContainer();
+
+		// Initialize mobile view empty tab replacement
+		this.initializeMobileViewReplacement();
 
 		// Add command to toggle folder container collapse
 		this.addCommand({
@@ -216,6 +228,19 @@ export default class MyPlugin extends Plugin {
 				} else {
 					this.debugLog('Navigator view not found for manual retry');
 				}
+			}
+		});
+
+		// Add command to open mobile view
+		this.addCommand({
+			id: 'open-mobile-navigator',
+			name: 'Open mobile navigator',
+			callback: async () => {
+				const leaf = this.app.workspace.getLeaf();
+				await leaf.setViewState({
+					type: MOBILE_NAVIGATOR_VIEW_TYPE,
+					active: true
+				});
 			}
 		});
 
@@ -501,6 +526,36 @@ export default class MyPlugin extends Plugin {
 			return navigatorLeaf.view as NavigatorView;
 		}
 		return null;
+	}
+
+	private initializeMobileViewReplacement(): void {
+		if (!this.settings.enableMobileView) return;
+
+		// Listen for layout changes to detect new empty tabs
+		this.registerEvent(
+			this.app.workspace.on('layout-change', () => {
+				this.replaceEmptyTabsWithMobileView();
+			})
+		);
+
+		// Also check on startup
+		this.app.workspace.onLayoutReady(() => {
+			this.replaceEmptyTabsWithMobileView();
+		});
+	}
+
+	replaceEmptyTabsWithMobileView(): void {
+		if (!this.settings.enableMobileView || !Platform.isMobile) return;
+
+		// Find all empty tabs and replace them with mobile view
+		const leaves = this.app.workspace.getLeavesOfType('empty');
+		for (const leaf of leaves) {
+			this.debugLog('Replacing empty tab with mobile view');
+			leaf.setViewState({
+				type: MOBILE_NAVIGATOR_VIEW_TYPE,
+				active: false
+			});
+		}
 	}
 
 	debugLog(message: string, ...args: any[]): void {
@@ -791,6 +846,25 @@ class SampleSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.openSidebarsOnLoad = value;
 						await this.plugin.saveSettings();
+					});
+			});
+
+		// Mobile View Section
+		containerEl.createEl('h3', {text: 'Mobile View'});
+		
+		new Setting(containerEl)
+			.setName('Enable mobile view')
+			.setDesc('Replace empty tabs with mobile navigator view on mobile devices. Provides a unified interface for folder navigation and file browsing.')
+			.addToggle(toggle => {
+				toggle.setValue(this.plugin.settings.enableMobileView)
+					.onChange(async (value) => {
+						this.plugin.settings.enableMobileView = value;
+						await this.plugin.saveSettings();
+						
+						// Trigger immediate replacement check if enabling
+						if (value) {
+							this.plugin.replaceEmptyTabsWithMobileView();
+						}
 					});
 			});
 
