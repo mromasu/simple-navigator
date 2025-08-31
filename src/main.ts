@@ -191,19 +191,8 @@ export default class MyPlugin extends Plugin {
 		// Setup dynamic mobile detection
 		this.setupDynamicMobileDetection();
 
-		// Open navigator view in left sidebar if not already present
-		this.initializeNavigatorView();
-
-		// Auto-open sidebars if setting is enabled
-		if (this.settings.openSidebarsOnLoad) {
-			this.ensureLeftSidebarExpanded();
-		}
-
-		// Initialize mod-left-extend container on load
-		this.initializeFolderContainer();
-
-		// Initialize mobile view empty tab replacement
-		this.initializeMobileViewReplacement();
+		// Initialize platform-specific features
+		this.initializePlatformSpecificFeatures();
 
 		// Add command to toggle folder container collapse
 		this.addCommand({
@@ -535,6 +524,47 @@ export default class MyPlugin extends Plugin {
 			return navigatorLeaf.view as NavigatorView;
 		}
 		return null;
+	}
+
+	private initializePlatformSpecificFeatures(): void {
+		// Use Platform.isMobile for initial load detection (per Obsidian docs)
+		const isMobile = Platform.isMobile;
+		this.debugLog(`Initializing platform-specific features for ${isMobile ? 'mobile' : 'desktop'}`);
+
+		if (isMobile) {
+			// Mobile-specific initialization
+			this.initializeMobileFeatures();
+		} else {
+			// Desktop-specific initialization  
+			this.initializeDesktopFeatures();
+		}
+	}
+
+	private initializeMobileFeatures(): void {
+		this.debugLog('Initializing mobile-specific features');
+		
+		// Initialize mobile view empty tab replacement
+		this.initializeMobileViewReplacement();
+		
+		// Mobile devices don't need desktop sidebar features
+		// Focus on mobile navigation only
+	}
+
+	private initializeDesktopFeatures(): void {
+		this.debugLog('Initializing desktop-specific features');
+		
+		// Open navigator view in left sidebar if not already present
+		this.initializeNavigatorView();
+
+		// Auto-open sidebars if setting is enabled
+		if (this.settings.openSidebarsOnLoad) {
+			this.ensureLeftSidebarExpanded();
+		}
+
+		// Initialize mod-left-extend container on load
+		this.initializeFolderContainer();
+		
+		// Desktop may also have mobile view available via command, but don't auto-replace tabs
 	}
 
 	private initializeMobileViewReplacement(): void {
