@@ -12,6 +12,18 @@ This is an Obsidian plugin called "Simple Navigator" built with TypeScript. It's
 - `npm run build` - Use this to test code 
 - `npm run version` - Bump version and update manifest/versions files
 
+## Creating Releases
+
+To create a new GitHub release:
+
+1. Update version in `manifest.json` and `versions.json` if needed
+2. Run `npm run build` to generate `main.js`
+3. Create release with required files:
+   ```bash
+   gh release create vX.X.X-beta manifest.json main.js styles.css --title "Simple Navigator vX.X.X-beta" --prerelease --generate-notes
+   ```
+4. For stable releases, omit `--prerelease` flag
+
 ## Architecture
 
 - **Entry point**: `src/main.ts` - Contains the main plugin class `MyPlugin`
