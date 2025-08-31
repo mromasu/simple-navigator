@@ -1,7 +1,7 @@
 {
 	"id": "simple-navigator",
 	"name": "Simple Navigator",
-	"version": "0.1.1",
+	"version": "0.1.10",
 	"minAppVersion": "0.15.0",
 	"description": "A simple navigation plugin for Obsidian.",
 	"author": "Obsidian",
