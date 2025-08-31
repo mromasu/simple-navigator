@@ -556,8 +556,8 @@ export default class MyPlugin extends Plugin {
 	replaceEmptyTabsWithMobileView(): void {
 		if (!this.settings.enableMobileView) return;
 
-		// Use enhanced mobile detection
-		const isMobile = this.detectMobileMultiLayer();
+		// Use Platform.isMobile as primary detection method (per Obsidian docs)
+		const isMobile = this.detectMobileState();
 		if (!isMobile) return;
 
 		// Find all empty tabs and replace them with mobile view
@@ -610,8 +610,8 @@ export default class MyPlugin extends Plugin {
 		}
 	}
 
-	// Enhanced mobile detection system
-	private detectMobileMultiLayer(): boolean {
+	// Mobile detection system - uses Platform.isMobile as primary method per Obsidian docs
+	private detectMobileState(): boolean {
 		const now = Date.now();
 		
 		// Return cached result if still valid (5 second cache)
@@ -629,21 +629,21 @@ export default class MyPlugin extends Plugin {
 			result = false;
 			this.debugLog('Mobile detection: Force desktop mode enabled');
 		} else {
-			// Auto detection - use multiple layers
-			const platformMobile = Platform.isMobile;
-			const viewportMobile = this.detectMobileViewport();
-			const touchCapable = this.detectTouchCapability();
+			// Auto detection - Primary: Platform.isMobile (recommended by Obsidian docs)
+			result = Platform.isMobile;
+			this.debugLog(`Mobile detection: Platform.isMobile = ${result}`);
 			
-			// Primary: Platform.isMobile (most reliable)
-			result = platformMobile;
-			
-			// Secondary: If Platform is not mobile but viewport suggests mobile
-			if (!result && viewportMobile && touchCapable) {
-				result = true;
-				this.debugLog('Mobile detection: Viewport + touch override');
+			// Enhanced detection only for dynamic changes (when Platform.isMobile might not update)
+			if (!result) {
+				const viewportMobile = this.detectMobileViewport();
+				const touchCapable = this.detectTouchCapability();
+				
+				// Fallback: viewport + touch capability suggests mobile (for responsive design mode, etc.)
+				if (viewportMobile && touchCapable) {
+					result = true;
+					this.debugLog(`Mobile detection: Enhanced fallback detected mobile (viewport=${viewportMobile}, touch=${touchCapable})`);
+				}
 			}
-			
-			this.debugLog(`Mobile detection layers: Platform=${platformMobile}, Viewport=${viewportMobile}, Touch=${touchCapable}, Result=${result}`);
 		}
 
 		// Cache the result
@@ -693,7 +693,7 @@ export default class MyPlugin extends Plugin {
 			resizeTimeout = window.setTimeout(() => {
 				// Invalidate cache and re-detect
 				this.detectionCache = null;
-				this.detectMobileMultiLayer();
+				this.detectMobileState();
 			}, 250);
 		});
 
@@ -701,7 +701,7 @@ export default class MyPlugin extends Plugin {
 		this.registerDomEvent(window, 'orientationchange', () => {
 			setTimeout(() => {
 				this.detectionCache = null;
-				this.detectMobileMultiLayer();
+				this.detectMobileState();
 			}, 100);
 		});
 	}
