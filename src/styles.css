@@ -1026,8 +1026,47 @@ button.mobile-nav-action-btn:not(.clickable-icon) {
 
 /* All folder items use same grey background */
 
-/* Responsive adjustments for mobile */
-@media (max-width: 768px) {
+/* Enhanced responsive design with multiple breakpoints */
+
+/* Small mobile devices (portrait phones) */
+@media (max-width: 480px) {
+	.mobile-nav-header {
+		padding: 8px 12px;
+		min-height: 48px;
+		font-size: 14px;
+	}
+	
+	.mobile-nav-content {
+		padding: 8px;
+	}
+	
+	.mobile-folder-header {
+		padding: 12px;
+		min-height: 48px;
+		font-size: 14px;
+	}
+	
+	.mobile-file-item {
+		padding: 8px;
+		min-height: 64px;
+	}
+	
+	.mobile-file-image {
+		width: 48px;
+		height: 48px;
+	}
+	
+	.mobile-file-meta {
+		font-size: 11px;
+	}
+	
+	.mobile-file-title {
+		font-size: 14px;
+	}
+}
+
+/* Mobile devices (landscape phones and portrait tablets) */
+@media (max-width: 768px) and (min-width: 481px) {
 	.mobile-nav-header {
 		padding: 12px 16px;
 		min-height: 56px;
@@ -1042,9 +1081,68 @@ button.mobile-nav-action-btn:not(.clickable-icon) {
 		min-height: 56px;
 	}
 	
-
 	.mobile-file-image {
 		width: 64px;
 		height: 64px;
+	}
+}
+
+/* Tablets and small desktops */
+@media (max-width: 1024px) and (min-width: 769px) {
+	.mobile-nav-header {
+		padding: 16px 20px;
+		min-height: 60px;
+	}
+	
+	.mobile-nav-content {
+		padding: 16px;
+	}
+	
+	.mobile-folder-header {
+		padding: 20px;
+		min-height: 60px;
+	}
+	
+	.mobile-file-image {
+		width: 72px;
+		height: 72px;
+	}
+	
+	/* Enhanced touch targets for tablet */
+	.mobile-file-item {
+		min-height: 84px;
+		padding: 12px 16px;
+	}
+	
+	.mobile-folder-item {
+		min-height: 64px;
+		padding: 12px 16px;
+	}
+}
+
+/* Touch device optimizations (any size) */
+@media (hover: none) and (pointer: coarse) {
+	/* Increase touch targets for all touch devices */
+	.mobile-file-item, 
+	.mobile-folder-item {
+		min-height: 64px;
+		padding: 12px 16px;
+	}
+	
+	/* Add visual feedback for touch */
+	.mobile-file-item:active,
+	.mobile-folder-item:active {
+		background-color: var(--background-modifier-hover);
+		transform: scale(0.98);
+		transition: all 0.1s ease;
+	}
+}
+
+/* High DPI displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+	.mobile-file-image {
+		/* Ensure crisp images on retina displays */
+		image-rendering: -webkit-optimize-contrast;
+		image-rendering: crisp-edges;
 	}
 }

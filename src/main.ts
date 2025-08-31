@@ -16,6 +16,7 @@ interface MyPluginSettings {
 	debugLogging: boolean;
 	openSidebarsOnLoad: boolean;
 	enableMobileView: boolean;
+	mobileDetectionMode: 'auto' | 'force-mobile' | 'force-desktop';
 }
 
 const DEFAULT_SETTINGS: MyPluginSettings = {
@@ -27,7 +28,8 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	pinnedFiles: [],
 	debugLogging: false,
 	openSidebarsOnLoad: true,
-	enableMobileView: true
+	enableMobileView: true,
+	mobileDetectionMode: 'auto'
 }
 
 class FolderSuggestModal extends SuggestModal<TFolder> {
@@ -164,6 +166,10 @@ export default class MyPlugin extends Plugin {
 	private fileCache: TFile[] | null = null;
 	private cacheValidUntil: number = 0;
 
+	// Enhanced mobile detection
+	private currentMobileState: boolean = false;
+	private detectionCache: { result: boolean; timestamp: number } | null = null;
+
 	async onload() {
 		await this.loadSettings();
 
@@ -181,6 +187,9 @@ export default class MyPlugin extends Plugin {
 			MOBILE_NAVIGATOR_VIEW_TYPE,
 			(leaf) => new MobileNavigatorView(leaf, this)
 		);
+
+		// Setup dynamic mobile detection
+		this.setupDynamicMobileDetection();
 
 		// Open navigator view in left sidebar if not already present
 		this.initializeNavigatorView();
@@ -239,7 +248,7 @@ export default class MyPlugin extends Plugin {
 				const leaf = this.app.workspace.getLeaf();
 				await leaf.setViewState({
 					type: MOBILE_NAVIGATOR_VIEW_TYPE,
-					active: true
+					active: true // Consistent active state
 				});
 			}
 		});
@@ -545,23 +554,156 @@ export default class MyPlugin extends Plugin {
 	}
 
 	replaceEmptyTabsWithMobileView(): void {
-		if (!this.settings.enableMobileView || !Platform.isMobile) return;
+		if (!this.settings.enableMobileView) return;
+
+		// Use enhanced mobile detection
+		const isMobile = this.detectMobileMultiLayer();
+		if (!isMobile) return;
 
 		// Find all empty tabs and replace them with mobile view
 		const leaves = this.app.workspace.getLeavesOfType('empty');
 		for (const leaf of leaves) {
 			this.debugLog('Replacing empty tab with mobile view');
-			leaf.setViewState({
-				type: MOBILE_NAVIGATOR_VIEW_TYPE,
-				active: false
-			});
+			this.replaceEmptyTabWithRetry(leaf);
 		}
+	}
+
+	private async replaceEmptyTabWithRetry(leaf: any): Promise<void> {
+		const maxAttempts = 3;
+		let attempts = 0;
+
+		const tryReplace = async (): Promise<boolean> => {
+			try {
+				await leaf.setViewState({
+					type: MOBILE_NAVIGATOR_VIEW_TYPE,
+					active: true // Fixed: consistent active state
+				});
+				this.debugLog(`Successfully replaced empty tab on attempt ${attempts + 1}`);
+				return true;
+			} catch (error) {
+				this.debugLog(`Failed to replace empty tab on attempt ${attempts + 1}:`, error);
+				return false;
+			}
+		};
+
+		// Try with exponential backoff
+		while (attempts < maxAttempts) {
+			if (await tryReplace()) {
+				return;
+			}
+			
+			attempts++;
+			if (attempts < maxAttempts) {
+				// Exponential backoff: 100ms, 300ms, 900ms
+				const delay = 100 * Math.pow(3, attempts - 1);
+				this.debugLog(`Retrying empty tab replacement in ${delay}ms`);
+				await new Promise(resolve => setTimeout(resolve, delay));
+			}
+		}
+
+		this.debugLog(`Failed to replace empty tab after ${maxAttempts} attempts`);
 	}
 
 	debugLog(message: string, ...args: any[]): void {
 		if (this.settings.debugLogging) {
 			console.log(`[Simple Navigator Debug] ${message}`, ...args);
 		}
+	}
+
+	// Enhanced mobile detection system
+	private detectMobileMultiLayer(): boolean {
+		const now = Date.now();
+		
+		// Return cached result if still valid (5 second cache)
+		if (this.detectionCache && now - this.detectionCache.timestamp < 5000) {
+			return this.detectionCache.result;
+		}
+
+		let result = false;
+
+		// Check manual override first
+		if (this.settings.mobileDetectionMode === 'force-mobile') {
+			result = true;
+			this.debugLog('Mobile detection: Force mobile mode enabled');
+		} else if (this.settings.mobileDetectionMode === 'force-desktop') {
+			result = false;
+			this.debugLog('Mobile detection: Force desktop mode enabled');
+		} else {
+			// Auto detection - use multiple layers
+			const platformMobile = Platform.isMobile;
+			const viewportMobile = this.detectMobileViewport();
+			const touchCapable = this.detectTouchCapability();
+			
+			// Primary: Platform.isMobile (most reliable)
+			result = platformMobile;
+			
+			// Secondary: If Platform is not mobile but viewport suggests mobile
+			if (!result && viewportMobile && touchCapable) {
+				result = true;
+				this.debugLog('Mobile detection: Viewport + touch override');
+			}
+			
+			this.debugLog(`Mobile detection layers: Platform=${platformMobile}, Viewport=${viewportMobile}, Touch=${touchCapable}, Result=${result}`);
+		}
+
+		// Cache the result
+		this.detectionCache = { result, timestamp: now };
+		
+		// Update current state if changed
+		if (this.currentMobileState !== result) {
+			this.currentMobileState = result;
+			this.onMobileStateChange(result);
+		}
+
+		return result;
+	}
+
+	private detectMobileViewport(): boolean {
+		// Use multiple viewport indicators
+		const width = window.innerWidth;
+		const height = window.innerHeight;
+		const aspectRatio = width / height;
+		
+		// Mobile if width <= 768px OR portrait aspect ratio with small screen
+		return width <= 768 || (aspectRatio < 1.2 && width <= 1024);
+	}
+
+	private detectTouchCapability(): boolean {
+		return 'ontouchstart' in window || 
+			   navigator.maxTouchPoints > 0 || 
+			   (navigator as any).msMaxTouchPoints > 0;
+	}
+
+	private onMobileStateChange(isMobile: boolean): void {
+		this.debugLog(`Mobile state changed to: ${isMobile}`);
+		
+		// Trigger mobile view replacement if needed
+		if (this.settings.enableMobileView && isMobile) {
+			// Small delay to ensure layout is stable
+			setTimeout(() => this.replaceEmptyTabsWithMobileView(), 100);
+		}
+	}
+
+	private setupDynamicMobileDetection(): void {
+		let resizeTimeout: number;
+		
+		this.registerDomEvent(window, 'resize', () => {
+			// Debounce resize events
+			clearTimeout(resizeTimeout);
+			resizeTimeout = window.setTimeout(() => {
+				// Invalidate cache and re-detect
+				this.detectionCache = null;
+				this.detectMobileMultiLayer();
+			}, 250);
+		});
+
+		// Also listen for orientation change (mobile-specific)
+		this.registerDomEvent(window, 'orientationchange', () => {
+			setTimeout(() => {
+				this.detectionCache = null;
+				this.detectMobileMultiLayer();
+			}, 100);
+		});
 	}
 }
 
@@ -863,6 +1005,27 @@ class SampleSettingTab extends PluginSettingTab {
 						
 						// Trigger immediate replacement check if enabling
 						if (value) {
+							this.plugin.replaceEmptyTabsWithMobileView();
+						}
+					});
+			});
+
+		new Setting(containerEl)
+			.setName('Mobile detection mode')
+			.setDesc('Control how the plugin detects mobile devices. "Auto" uses intelligent detection, "Force Mobile" always uses mobile view, "Force Desktop" never uses mobile view.')
+			.addDropdown(dropdown => {
+				dropdown
+					.addOption('auto', 'Auto (Recommended)')
+					.addOption('force-mobile', 'Force Mobile')
+					.addOption('force-desktop', 'Force Desktop')
+					.setValue(this.plugin.settings.mobileDetectionMode)
+					.onChange(async (value: 'auto' | 'force-mobile' | 'force-desktop') => {
+						this.plugin.settings.mobileDetectionMode = value;
+						await this.plugin.saveSettings();
+						
+						// Invalidate detection cache and re-evaluate
+						(this.plugin as any).detectionCache = null;
+						if (this.plugin.settings.enableMobileView) {
 							this.plugin.replaceEmptyTabsWithMobileView();
 						}
 					});
